@@ -1,0 +1,12 @@
+numpy==2.3.3
+packaging==25.0
+pandas==2.3.2
+pyet==1.4.0
+python-dateutil==2.9.0.post0
+pytz==2025.2
+six==1.17.0
+tzdata==2025.2
+xarray==2025.9.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+jinja2>=3.1.0
