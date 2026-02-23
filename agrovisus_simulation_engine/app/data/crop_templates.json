@@ -1,0 +1,278 @@
+{
+    "_metadata": {
+        "description": "Validated crop parameter templates for AgroVisus simulation engine",
+        "version": "1.0",
+        "sources": [
+            "FAO-56 Irrigation and Drainage Paper",
+            "Purdue Extension (Corn)",
+            "USDA Crop Parameters",
+            "IRRI Rice Knowledge Bank",
+            "Kansas State University (Sorghum)"
+        ]
+    },
+    "corn": {
+        "crop_name": "Corn (Maize)",
+        "initial_stage": "VE",
+        "t_base_c": 10.0,
+        "t_upper_c": 30.0,
+        "water_stress_threshold_awc": 0.4,
+        "anaerobic_stress_threshold_awc": 0.95,
+        "radiation_use_efficiency_g_mj": 3.5,
+        "harvest_index": 0.50,
+        "max_root_depth_mm": 1200.0,
+        "daily_root_growth_rate_mm": 15.0,
+        "gdd_thresholds": {
+            "VE": 0,
+            "V2": 120,
+            "V6": 400,
+            "V10": 650,
+            "VT": 850,
+            "R1": 1000,
+            "R3": 1300,
+            "R6": 1700
+        },
+        "kc_per_stage": {
+            "VE": 0.35,
+            "V2": 0.45,
+            "V6": 0.75,
+            "V10": 1.05,
+            "VT": 1.15,
+            "R1": 1.15,
+            "R3": 0.95,
+            "R6": 0.50
+        },
+        "light_interception_per_stage": {
+            "VE": 0.10,
+            "V2": 0.30,
+            "V6": 0.70,
+            "V10": 0.95,
+            "VT": 1.00,
+            "R1": 1.00,
+            "R3": 0.90,
+            "R6": 0.70
+        },
+        "N_demand_kg_ha_per_stage": {
+            "VE": 0.3,
+            "V2": 0.7,
+            "V6": 2.0,
+            "V10": 3.0,
+            "VT": 3.5,
+            "R1": 2.5,
+            "R3": 1.5,
+            "R6": 0.5
+        },
+        "kc_fallback": 0.70
+    },
+    "wheat": {
+        "crop_name": "Winter Wheat",
+        "initial_stage": "Emergence",
+        "t_base_c": 0.0,
+        "t_upper_c": 25.0,
+        "water_stress_threshold_awc": 0.45,
+        "anaerobic_stress_threshold_awc": 0.95,
+        "radiation_use_efficiency_g_mj": 2.8,
+        "harvest_index": 0.40,
+        "max_root_depth_mm": 1500.0,
+        "daily_root_growth_rate_mm": 12.0,
+        "gdd_thresholds": {
+            "Emergence": 0,
+            "Tillering": 200,
+            "Jointing": 600,
+            "Booting": 1000,
+            "Heading": 1200,
+            "Flowering": 1400,
+            "GrainFilling": 1700,
+            "Maturation": 2200
+        },
+        "kc_per_stage": {
+            "Emergence": 0.30,
+            "Tillering": 0.40,
+            "Jointing": 0.75,
+            "Booting": 1.00,
+            "Heading": 1.15,
+            "Flowering": 1.15,
+            "GrainFilling": 0.80,
+            "Maturation": 0.40
+        },
+        "light_interception_per_stage": {
+            "Emergence": 0.10,
+            "Tillering": 0.35,
+            "Jointing": 0.70,
+            "Booting": 0.90,
+            "Heading": 0.95,
+            "Flowering": 0.95,
+            "GrainFilling": 0.85,
+            "Maturation": 0.60
+        },
+        "N_demand_kg_ha_per_stage": {
+            "Emergence": 0.2,
+            "Tillering": 0.8,
+            "Jointing": 2.5,
+            "Booting": 3.0,
+            "Heading": 2.5,
+            "Flowering": 2.0,
+            "GrainFilling": 1.5,
+            "Maturation": 0.3
+        },
+        "kc_fallback": 0.65
+    },
+    "rice": {
+        "crop_name": "Rice (Paddy)",
+        "initial_stage": "Emergence",
+        "t_base_c": 10.0,
+        "t_upper_c": 35.0,
+        "water_stress_threshold_awc": 0.60,
+        "anaerobic_stress_threshold_awc": 1.00,
+        "radiation_use_efficiency_g_mj": 2.5,
+        "harvest_index": 0.45,
+        "max_root_depth_mm": 600.0,
+        "daily_root_growth_rate_mm": 8.0,
+        "gdd_thresholds": {
+            "Emergence": 0,
+            "Seedling": 150,
+            "Tillering": 400,
+            "StemElongation": 700,
+            "Booting": 1000,
+            "Flowering": 1250,
+            "GrainFilling": 1500,
+            "Maturation": 1800
+        },
+        "kc_per_stage": {
+            "Emergence": 1.05,
+            "Seedling": 1.10,
+            "Tillering": 1.15,
+            "StemElongation": 1.20,
+            "Booting": 1.20,
+            "Flowering": 1.15,
+            "GrainFilling": 1.05,
+            "Maturation": 0.90
+        },
+        "light_interception_per_stage": {
+            "Emergence": 0.10,
+            "Seedling": 0.25,
+            "Tillering": 0.55,
+            "StemElongation": 0.80,
+            "Booting": 0.90,
+            "Flowering": 0.95,
+            "GrainFilling": 0.85,
+            "Maturation": 0.65
+        },
+        "N_demand_kg_ha_per_stage": {
+            "Emergence": 0.2,
+            "Seedling": 0.5,
+            "Tillering": 1.8,
+            "StemElongation": 2.5,
+            "Booting": 2.8,
+            "Flowering": 2.0,
+            "GrainFilling": 1.2,
+            "Maturation": 0.3
+        },
+        "kc_fallback": 1.10
+    },
+    "soybean": {
+        "crop_name": "Soybean",
+        "initial_stage": "VE",
+        "t_base_c": 10.0,
+        "t_upper_c": 30.0,
+        "water_stress_threshold_awc": 0.50,
+        "anaerobic_stress_threshold_awc": 0.95,
+        "radiation_use_efficiency_g_mj": 1.8,
+        "harvest_index": 0.35,
+        "max_root_depth_mm": 900.0,
+        "daily_root_growth_rate_mm": 10.0,
+        "gdd_thresholds": {
+            "VE": 0,
+            "V2": 100,
+            "V6": 350,
+            "R1": 600,
+            "R3": 850,
+            "R5": 1050,
+            "R7": 1300,
+            "R8": 1500
+        },
+        "kc_per_stage": {
+            "VE": 0.30,
+            "V2": 0.40,
+            "V6": 0.75,
+            "R1": 1.10,
+            "R3": 1.15,
+            "R5": 1.10,
+            "R7": 0.70,
+            "R8": 0.40
+        },
+        "light_interception_per_stage": {
+            "VE": 0.08,
+            "V2": 0.25,
+            "V6": 0.65,
+            "R1": 0.90,
+            "R3": 0.95,
+            "R5": 0.90,
+            "R7": 0.70,
+            "R8": 0.50
+        },
+        "N_demand_kg_ha_per_stage": {
+            "VE": 0.2,
+            "V2": 0.4,
+            "V6": 1.0,
+            "R1": 1.5,
+            "R3": 2.0,
+            "R5": 2.5,
+            "R7": 1.0,
+            "R8": 0.3
+        },
+        "kc_fallback": 0.70
+    },
+    "sorghum": {
+        "crop_name": "Grain Sorghum",
+        "initial_stage": "Emergence",
+        "t_base_c": 10.0,
+        "t_upper_c": 35.0,
+        "water_stress_threshold_awc": 0.35,
+        "anaerobic_stress_threshold_awc": 0.95,
+        "radiation_use_efficiency_g_mj": 3.2,
+        "harvest_index": 0.45,
+        "max_root_depth_mm": 1500.0,
+        "daily_root_growth_rate_mm": 18.0,
+        "gdd_thresholds": {
+            "Emergence": 0,
+            "ThreeLeaf": 180,
+            "FiveLeaf": 400,
+            "FlagLeaf": 750,
+            "Boot": 1000,
+            "Flowering": 1250,
+            "GrainFilling": 1550,
+            "Maturation": 1900
+        },
+        "kc_per_stage": {
+            "Emergence": 0.30,
+            "ThreeLeaf": 0.40,
+            "FiveLeaf": 0.70,
+            "FlagLeaf": 0.95,
+            "Boot": 1.10,
+            "Flowering": 1.10,
+            "GrainFilling": 0.85,
+            "Maturation": 0.45
+        },
+        "light_interception_per_stage": {
+            "Emergence": 0.10,
+            "ThreeLeaf": 0.30,
+            "FiveLeaf": 0.65,
+            "FlagLeaf": 0.85,
+            "Boot": 0.95,
+            "Flowering": 0.95,
+            "GrainFilling": 0.85,
+            "Maturation": 0.60
+        },
+        "N_demand_kg_ha_per_stage": {
+            "Emergence": 0.2,
+            "ThreeLeaf": 0.6,
+            "FiveLeaf": 1.8,
+            "FlagLeaf": 2.8,
+            "Boot": 3.0,
+            "Flowering": 2.5,
+            "GrainFilling": 1.5,
+            "Maturation": 0.4
+        },
+        "kc_fallback": 0.65
+    }
+}

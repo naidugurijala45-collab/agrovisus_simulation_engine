@@ -1,0 +1,73 @@
+{
+  "rules": [
+    {
+      "id": "Drought_Stress_Risk",
+      "name": "Potential Drought Stress",
+      "conditions": [
+        {
+          "path": "soil.fraction_awc",
+          "operator": "less_than",
+          "threshold": 0.35
+        }
+      ],
+      "result": {
+        "severity": "High",
+        "alert_type": "Drought Stress",
+        "recommendation": "Soil moisture is critically low. Immediate irrigation is recommended to prevent yield loss."
+      }
+    },
+    {
+      "id": "Low_Nitrogen_Warning",
+      "name": "Low Soil Nitrogen",
+      "conditions": [
+        {
+          "path": "nutrients.available_N_kg_ha",
+          "operator": "less_than",
+          "threshold": 15.0
+        },
+        {
+          "path": "crop.stage",
+          "operator": "not_in",
+          "threshold": ["R6"]
+        }
+      ],
+      "result": {
+        "severity": "Moderate",
+        "alert_type": "Nutrient Stress",
+        "recommendation": "Available Nitrogen is low for the current growth stage. Consider top-dressing with N fertilizer."
+      }
+    },
+    {
+      "id": "Moderate_Foliar_Disease_Risk_LWD",
+      "name": "Potential Moderate Foliar Disease Risk (from Leaf Wetness)",
+      "conditions": [
+        {
+          "path": "weather.leaf_wetness_hours",
+          "operator": "greater_than",
+          "threshold": 8.0
+        }
+      ],
+      "result": {
+        "severity": "Moderate",
+        "alert_type": "Foliar Disease Risk",
+        "recommendation": "Conditions are moderately favorable for foliar disease. Increase scouting frequency."
+      }
+    },
+    {
+      "id": "Low_Foliar_Disease_Pressure_LWD",
+      "name": "Low Foliar Disease Pressure (from Leaf Wetness)",
+      "conditions": [
+        {
+          "path": "weather.leaf_wetness_hours",
+          "operator": "less_than",
+          "threshold": 4.0
+        }
+      ],
+      "result": {
+        "severity": "Low",
+        "alert_type": "Foliar Disease Risk",
+        "recommendation": "Leaf wetness duration is low, reducing general risk for many foliar diseases."
+      }
+    }
+  ]
+}

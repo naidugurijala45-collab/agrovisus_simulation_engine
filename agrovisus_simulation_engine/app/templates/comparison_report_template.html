@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroVisus — Scenario Comparison</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-green: #4ade80;
+            --accent-blue: #38bdf8;
+            --accent-purple: #a78bfa;
+            --accent-amber: #fbbf24;
+            --border: rgba(255, 255, 255, 0.06);
+            --gradient-card: linear-gradient(135deg, #1e293b 0%, #1a2332 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: var(--gradient-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .meta {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .section {
+            background: var(--gradient-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid rgba(167, 139, 250, 0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th,
+        td {
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            font-weight: 500;
+        }
+
+        .plot-container {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .plot-container h3 {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Scenario Comparison Report</h1>
+            <div class="meta">
+                <span>📅 Generated: {{ generation_date }}</span>
+                <span> &nbsp;·&nbsp; {{ scenario_names | length }} scenarios compared</span>
+            </div>
+        </div>
+
+        <!-- KPI Comparison Table -->
+        <div class="section">
+            <h2>📊 Key Performance Indicators</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>KPI</th>
+                        {% for name in scenario_names %}
+                        <th>{{ name }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if all_kpis %}
+                    <tr>
+                        <td>Final Biomass (kg/ha)</td>
+                        {% for name in scenario_names %}
+                        <td>{{ all_kpis[name].final_biomass_kg_ha | round(0) | int if all_kpis[name].final_biomass_kg_ha
+                            is defined else 'N/A' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Estimated Yield (kg/ha)</td>
+                        {% for name in scenario_names %}
+                        <td>{{ all_kpis[name].final_yield_kg_ha | round(0) | int if all_kpis[name].final_yield_kg_ha is
+                            defined else 'N/A' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Total Irrigation (mm)</td>
+                        {% for name in scenario_names %}
+                        <td>{{ all_kpis[name].total_irrigation_mm | round(1) }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Total N Leached (kg/ha)</td>
+                        {% for name in scenario_names %}
+                        <td>{{ all_kpis[name].total_n_leached_kg_ha | round(2) }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Peak Disease Severity (%)</td>
+                        {% for name in scenario_names %}
+                        <td>{{ all_kpis[name].peak_disease_severity_percent | round(2) }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Avg Stress Factor</td>
+                        {% for name in scenario_names %}
+                        <td>{{ all_kpis[name].avg_stress_factor | round(2) if all_kpis[name].avg_stress_factor is
+                            defined else 'N/A' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bar Chart Comparisons -->
+        <div class="section">
+            <h2>📈 Summary Comparisons</h2>
+            {% if plot_paths.yield_comparison_plot %}
+            <div class="plot-container">
+                <h3>Estimated Yield</h3>
+                <img src="{{ plot_paths.yield_comparison_plot }}" alt="Yield Comparison">
+            </div>
+            {% endif %}
+            {% if plot_paths.irrigation_comparison_plot %}
+            <div class="plot-container">
+                <h3>Total Irrigation</h3>
+                <img src="{{ plot_paths.irrigation_comparison_plot }}" alt="Irrigation Comparison">
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Time-Series Comparisons -->
+        <div class="section">
+            <h2>📉 Daily Progression Comparisons</h2>
+            {% if plot_paths.comparative_biomass_plot %}
+            <div class="plot-container">
+                <h3>Biomass Accumulation</h3>
+                <img src="{{ plot_paths.comparative_biomass_plot }}" alt="Biomass Comparison">
+            </div>
+            {% endif %}
+            {% if plot_paths.comparative_awc_plot %}
+            <div class="plot-container">
+                <h3>Soil Moisture (Fraction AWC)</h3>
+                <img src="{{ plot_paths.comparative_awc_plot }}" alt="AWC Comparison">
+            </div>
+            {% endif %}
+            {% if plot_paths.comparative_stress_plot %}
+            <div class="plot-container">
+                <h3>Overall Crop Stress</h3>
+                <img src="{{ plot_paths.comparative_stress_plot }}" alt="Stress Comparison">
+            </div>
+            {% endif %}
+            {% if plot_paths.comparative_disease_plot %}
+            <div class="plot-container">
+                <h3>Disease Severity</h3>
+                <img src="{{ plot_paths.comparative_disease_plot }}" alt="Disease Comparison">
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="footer">AgroVisus Simulation Engine v4.0</div>
+    </div>
+</body>
+
+</html>

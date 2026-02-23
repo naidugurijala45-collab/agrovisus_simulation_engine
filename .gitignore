@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# ML / Training artifacts
+*.pt
+*.pth
+*.pkl
+*.h5
+*.onnx
+runs/
+logs/
+checkpoints/
+wandb/
+
+# Data files (large)
+*.csv
+*.parquet
+*.feather
+data/raw/
+data/processed/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / config
+*.env
+secrets.yaml
+config/local*.yaml

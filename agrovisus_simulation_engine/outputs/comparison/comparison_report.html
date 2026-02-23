@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroVisus — Scenario Comparison</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-green: #4ade80;
+            --accent-blue: #38bdf8;
+            --accent-purple: #a78bfa;
+            --accent-amber: #fbbf24;
+            --border: rgba(255, 255, 255, 0.06);
+            --gradient-card: linear-gradient(135deg, #1e293b 0%, #1a2332 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: var(--gradient-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .meta {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .section {
+            background: var(--gradient-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid rgba(167, 139, 250, 0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th,
+        td {
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            font-weight: 500;
+        }
+
+        .plot-container {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .plot-container h3 {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Scenario Comparison Report</h1>
+            <div class="meta">
+                <span>📅 Generated: 2026-02-16 21:44:28</span>
+                <span> &nbsp;·&nbsp; 2 scenarios compared</span>
+            </div>
+        </div>
+
+        <!-- KPI Comparison Table -->
+        <div class="section">
+            <h2>📊 Key Performance Indicators</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>KPI</th>
+                        
+                        <th>Corn (Maize)</th>
+                        
+                        <th>Winter Wheat</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>Final Biomass (kg/ha)</td>
+                        
+                        <td>11555</td>
+                        
+                        <td>12144</td>
+                        
+                    </tr>
+                    <tr>
+                        <td>Estimated Yield (kg/ha)</td>
+                        
+                        <td>5778</td>
+                        
+                        <td>6072</td>
+                        
+                    </tr>
+                    <tr>
+                        <td>Total Irrigation (mm)</td>
+                        
+                        <td>275.0</td>
+                        
+                        <td>275.0</td>
+                        
+                    </tr>
+                    <tr>
+                        <td>Total N Leached (kg/ha)</td>
+                        
+                        <td>0.0</td>
+                        
+                        <td>0.0</td>
+                        
+                    </tr>
+                    <tr>
+                        <td>Peak Disease Severity (%)</td>
+                        
+                        <td>0.05</td>
+                        
+                        <td>0.05</td>
+                        
+                    </tr>
+                    <tr>
+                        <td>Avg Stress Factor</td>
+                        
+                        <td>0.81</td>
+                        
+                        <td>0.81</td>
+                        
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bar Chart Comparisons -->
+        <div class="section">
+            <h2>📈 Summary Comparisons</h2>
+            
+            <div class="plot-container">
+                <h3>Estimated Yield</h3>
+                <img src="plots\comp_yield.png" alt="Yield Comparison">
+            </div>
+            
+            
+            <div class="plot-container">
+                <h3>Total Irrigation</h3>
+                <img src="plots\comp_irrigation.png" alt="Irrigation Comparison">
+            </div>
+            
+        </div>
+
+        <!-- Time-Series Comparisons -->
+        <div class="section">
+            <h2>📉 Daily Progression Comparisons</h2>
+            
+            <div class="plot-container">
+                <h3>Biomass Accumulation</h3>
+                <img src="plots\comp_biomass.png" alt="Biomass Comparison">
+            </div>
+            
+            
+            <div class="plot-container">
+                <h3>Soil Moisture (Fraction AWC)</h3>
+                <img src="plots\comp_awc.png" alt="AWC Comparison">
+            </div>
+            
+            
+            <div class="plot-container">
+                <h3>Overall Crop Stress</h3>
+                <img src="plots\comp_stress.png" alt="Stress Comparison">
+            </div>
+            
+            
+            <div class="plot-container">
+                <h3>Disease Severity</h3>
+                <img src="plots\comp_disease.png" alt="Disease Comparison">
+            </div>
+            
+        </div>
+
+        <div class="footer">AgroVisus Simulation Engine v4.0</div>
+    </div>
+</body>
+
+</html>
