@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-ENGINE_ROOT = Path(__file__).parent.parent.parent / "agrovisus_simulation_engine"
+ENGINE_ROOT = Path(__file__).parent.parent.parent / "engine"
 sys.path.insert(0, str(ENGINE_ROOT))
 
 router = APIRouter()

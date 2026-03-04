@@ -14,7 +14,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-ENGINE_ROOT = Path(__file__).parent.parent.parent / "agrovisus_simulation_engine"
+ENGINE_ROOT = Path(__file__).parent.parent.parent / "engine"
 sys.path.insert(0, str(ENGINE_ROOT))
 
 from app.services.simulation_service import SimulationService

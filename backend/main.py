@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Add simulation engine to path
-ENGINE_ROOT = Path(__file__).parent.parent / "agrovisus_simulation_engine"
+ENGINE_ROOT = Path(__file__).parent.parent / "engine"
 sys.path.insert(0, str(ENGINE_ROOT))
 
 from backend.routers import simulation, disease, crops
