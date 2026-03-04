@@ -3,6 +3,7 @@ AgroVisus FastAPI Backend — Main Entry Point
 """
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from fastapi import FastAPI
@@ -22,9 +23,14 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# ALLOWED_ORIGINS env var: comma-separated list of production origins
+# e.g. "https://agrovisus.vercel.app,https://agrovisus-git-main.vercel.app"
+_extra = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://localhost:.*",
+    allow_origins=_extra,
+    allow_origin_regex=r"https?://localhost:.*|https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

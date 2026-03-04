@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// All /api calls are proxied by Vite to the FastAPI backend
-// No absolute URL needed — avoids CORS issues entirely
+// Local dev: Vite proxies /api → localhost:8001 (see vite.config.js)
+// Production: set VITE_API_URL=https://your-backend.onrender.com/api in Vercel env vars
 const api = axios.create({
-    baseURL: '/api',
+    baseURL: import.meta.env.VITE_API_URL ?? '/api',
     timeout: 120000,
 });
 
