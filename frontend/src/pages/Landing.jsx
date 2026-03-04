@@ -275,10 +275,10 @@ export default function Landing() {
                 </div>
                 <div className="how-steps">
                     {[
-                        { num: '01', icon: '⚙️', title: 'Configure', desc: 'Select your crop, set location, simulation length, and initial conditions.' },
-                        { num: '02', icon: '🔬', title: 'Simulate', desc: 'The physics engine models 91 days of growth with real-world weather integration.' },
-                        { num: '03', icon: '🤖', title: 'Optimise', desc: 'The RL agent evaluates decisions — compare AI vs random agent outcomes.' },
-                        { num: '04', icon: '📈', title: 'Act', desc: 'Export actionable reports, advisory alerts, and timestamped recommendations.' },
+                        { num: '01', icon: '⚙️', title: 'Configure', desc: 'Choose your crop, field location, soil type, and season length.' },
+                        { num: '02', icon: '🔬', title: 'Simulate', desc: 'Run a full-season growth model using live weather and soil data.' },
+                        { num: '03', icon: '🤖', title: 'Optimise', desc: 'AI finds the irrigation and fertilisation plan that maximises your yield.' },
+                        { num: '04', icon: '📈', title: 'Act', desc: 'Receive day-by-day field recommendations you can put to work immediately.' },
                     ].map((s, i) => (
                         <div key={s.num} className="how-step">
                             <div className="hs-num">{s.num}</div>
