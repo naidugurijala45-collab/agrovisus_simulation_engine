@@ -64,6 +64,27 @@ config/local*.yaml
 # Weather cache (auto-generated, not source)
 .weather_cache/
 
+# Cache directories
+.ruff_cache/
+.pytest_cache/
+
+# Generated outputs
+outputs/
+
+# Trained model artifacts
+models/cnn/*.pth
+models/ppo/*.zip
+
+# Disease image datasets
+data/disease_images/
+
+# Sync / utility scripts
+sync_repo.py
+sync_check.ps1
+
+# Secrets
+secrets.py
+
 # Accidental pip log file
 3.1.0
 
