@@ -1,0 +1,199 @@
+# 📊 CropDiagnosisPlatform — Project Status Report
+**Date**: March 3, 2026  
+**Author**: Auto-generated via codebase analysis
+
+---
+
+## Executive Summary
+
+The **AgroVisus Crop Diagnosis Platform** has a fully functional simulation engine with trained AI models. The core science and RL training are complete. The primary remaining work is **packaging the platform into an investor-ready demo** — polishing the UI, integrating the disease classifier, and setting up CI/CD.
+
+---
+
+## Component Status
+
+### ✅ Core Simulation Engine — **~95% Complete**
+
+| Sub-Component | Status | Details |
+|---------------|--------|---------|
+| Crop Model | ✅ Done | GDD-based phenology, biomass, water/nutrient stress |
+| Crop Templates | ✅ Done | 5 crops pre-validated (Corn, Wheat, Rice, Soybean, Sorghum) |
+| Soil Model | ✅ Done | 3-layer cascading bucket, drainage, capillary rise |
+| Nutrient Model | ✅ Done | N mineralization, immobilization, crop uptake |
+| Disease Model | ✅ Done | Weather-driven, leaf wetness, stage-dependent |
+| Weather Service | ✅ Done | Open-Meteo API + smart caching + fallback |
+| ET0 Service | ✅ Done | Penman-Monteith and Hargreaves methods |
+| SimulationFacade | ✅ Done | Clean API for RL environment (facade pattern) |
+| Error Handling | ✅ Done | Custom exception hierarchy, user-friendly messages |
+| Input Validation | ✅ Done | Validators for all crop model parameters |
+
+**Key Files**: [simulation_service.py](file:///c:/Users/Naidu%20Gurijala/CropDiagnosisPlatform/agrovisus_simulation_engine/app/services/simulation_service.py), [crop_model.py](file:///c:/Users/Naidu%20Gurijala/CropDiagnosisPlatform/agrovisus_simulation_engine/app/models/crop_model.py), [soil_model.py](file:///c:/Users/Naidu%20Gurijala/CropDiagnosisPlatform/agrovisus_simulation_engine/app/soil_model.py)
+
+---
+
+### ✅ RL Agent (PPO) — **Complete**
+
+| Item | Status | Details |
+|------|--------|---------|
+| Gymnasium Environment | ✅ Done | Discrete(4) action space, normalized observations |
+| PPO Training | ✅ Done | v2 & v3 agents, 200k timesteps |
+| Evaluation Script | ✅ Done | [diagnose_v3_agent.py](file:///c:/Users/Naidu%20Gurijala/CropDiagnosisPlatform/agrovisus_simulation_engine/diagnose_v3_agent.py) for performance analysis |
+| Trained Model Files | ✅ Saved | `models/ppo/` directory |
+
+---
+
+### ✅ Reporting & Dashboard — **Complete**
+
+| Item | Status | Details |
+|------|--------|---------|
+| HTML Report Generator | ✅ Done | Dark-themed, 7 KPI cards, 5 plot types |
+| Comparative Reports | ✅ Done | Side-by-side crop comparison HTML |
+| Streamlit Dashboard | ✅ Done | Interactive Plotly charts, crop comparison tab |
+| Batch Scenario Runner | ✅ Done | CLI for multi-crop comparison |
+| CSV Data Export | ✅ Done | Daily simulation data output |
+
+---
+
+### ✅ Test Suite — **Exists (8 files, 60+ tests)**
+
+| Test File | Coverage Area |
+|-----------|--------------|
+| `test_integration.py` | End-to-end simulation |
+| `test_crop_templates.py` | Template loading & validation |
+| `test_weather_service.py` | Weather API & fallbacks |
+| `test_exceptions.py` | Custom exception hierarchy |
+| `test_validators.py` | Input validators |
+| `test_soil_model_fixes.py` | Soil model correctness |
+| `test_simulation_service.py` | Simulation orchestrator |
+| `test_rl_env.py` | RL environment |
+
+> [!WARNING]
+> Tests were fixed in a recent session but CI/CD (GitHub Actions) is **not yet set up**.
+
+---
+
+### 🟡 FastAPI Backend — **~30% (Scaffolded)**
+
+| Item | Status | Details |
+|------|--------|---------|
+| FastAPI App (`main.py`) | ✅ Created | CORS configured, 3 routers included |
+| Simulation Router | ✅ Scaffolded | `/api/simulation` endpoints |
+| Disease Router | ✅ Scaffolded | `/api/disease` endpoints |
+| Crops Router | ✅ Scaffolded | `/api/crops` endpoints |
+| Health Check | ✅ Done | `GET /api/health` |
+| End-to-End Testing | ⬜ Not done | Backend not tested with frontend |
+| Deployment | ⬜ Not done | Not deployed anywhere |
+
+**Key File**: [main.py](file:///c:/Users/Naidu%20Gurijala/CropDiagnosisPlatform/backend/main.py)
+
+---
+
+### 🟡 React/Vite Frontend — **~30% (Scaffolded)**
+
+| Page | Size | Status |
+|------|------|--------|
+| `Landing.jsx` | 17KB | ✅ Built |
+| `Simulate.jsx` | 12KB | ✅ Built |
+| `Disease.jsx` | 8KB | ✅ Built |
+| `Reports.jsx` | <1KB | 🟡 Placeholder |
+
+| Item | Status |
+|------|--------|
+| Vite config | ✅ Done |
+| Routing (`App.jsx`) | ✅ Done |
+| API layer | 🟡 Started |
+| CSS styling | 🟡 Started (~29KB) |
+| Connected to backend | ⬜ Not done |
+
+---
+
+### 🟢 Trained Models — **Exist**
+
+| Model | File | Size |
+|-------|------|------|
+| CNN Disease Classifier | `models/best_model.pth` | ~67 MB |
+| PPO RL Agent | `models/ppo/` | Saved |
+
+> [!NOTE]
+> The CNN model exists but has not been integrated into the Streamlit dashboard for live image upload.
+
+---
+
+## Recent Activity (Last 3 Sessions)
+
+1. **Ran 90-day corn simulation** — Generated daily output CSV and validated results
+2. **Fixed broken unit tests** — Resolved failures in RL env, simulation service, and weather service tests after Phase 4 refactoring
+3. **Trained RL agent (Advanced)** — Debugged training loop, tuned rewards, completed 200k-step training
+
+---
+
+## MVP Readiness Checklist
+
+Based on [MVP_PLAN.md](file:///c:/Users/Naidu%20Gurijala/CropDiagnosisPlatform/MVP_PLAN.md):
+
+### Must-Have Items
+
+| # | Item | Status | Effort |
+|---|------|--------|--------|
+| 1 | Polished web demo (landing page, summary cards, investor UX) | 🟡 Partially done | 3–4 days |
+| 2 | Disease image upload (train on PlantVillage, integrate into UI) | 🟡 Scaffolded | 3–4 days |
+| 3 | One-page pitch integration (sidebar, "For Investors" tab, PDF export) | ⬜ Not started | 1–2 days |
+| 4 | Fix tests & CI (GitHub Actions, badges) | 🟡 Tests fixed, no CI | 1 day |
+| 5 | Investor-ready README (screenshots, GIF, architecture diagram) | 🟡 README exists, needs polish | 0.5 day |
+
+### Nice-to-Have Items
+
+| # | Item | Status |
+|---|------|--------|
+| 6 | Multi-crop support | ✅ Already done (5 crops) |
+| 7 | Real weather API | ✅ Already done (Open-Meteo) |
+| 8 | User accounts | ⬜ Not started |
+| 9 | Mobile-friendly design | ⬜ Not started |
+
+---
+
+## Architecture Overview
+
+```
+CropDiagnosisPlatform/
+├── agrovisus_simulation_engine/    ← Core engine (COMPLETE)
+│   ├── app/
+│   │   ├── models/                 ← Crop, Soil, Nutrient, Disease models
+│   │   ├── services/               ← Simulation, Weather, ET0, Reports
+│   │   ├── env/                    ← RL Gymnasium environment
+│   │   ├── utils/                  ← Validators, exceptions, calculations
+│   │   └── templates/              ← Jinja2 HTML report templates
+│   ├── tests/                      ← 8 test files, 60+ tests
+│   ├── outputs/                    ← Simulation CSV + HTML reports
+│   ├── dashboard.py                ← Streamlit dashboard
+│   ├── run.py                      ← CLI simulation runner
+│   └── scenario_runner.py          ← Batch crop comparison
+│
+├── backend/                        ← FastAPI API (SCAFFOLDED)
+│   ├── main.py                     ← App entry point
+│   └── routers/                    ← simulation, disease, crops
+│
+├── frontend/                       ← Vite + React (SCAFFOLDED)
+│   └── src/pages/                  ← Landing, Simulate, Disease, Reports
+│
+├── models/                         ← Trained AI models
+│   ├── best_model.pth              ← CNN (~67MB)
+│   └── ppo/                        ← PPO RL agent
+│
+├── MVP_PLAN.md                     ← 4-week sprint plan
+└── FUTURE_ARCHITECTURE_REDESIGN.md ← Post-funding architecture
+```
+
+---
+
+## Recommendations (Next Steps)
+
+1. **Polish the Streamlit demo first** — It's the fastest path to an investor-ready demo (skip the React frontend for now)
+2. **Integrate the disease classifier** into the Streamlit dashboard with image upload
+3. **Set up GitHub Actions** for CI (tests + badges)
+4. **Add investor-facing content** to the dashboard (summary cards, "How it Works", pitch tab)
+5. **Update README** with screenshots, GIF of the dashboard, and a polished architecture diagram
+
+---
+
+*Report generated from live codebase analysis on March 3, 2026*
