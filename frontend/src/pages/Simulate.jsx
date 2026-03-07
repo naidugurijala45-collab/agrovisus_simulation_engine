@@ -60,6 +60,30 @@ export default function Simulate() {
         }
     };
 
+    // Helper to group contiguous rules
+    const groupedRules = [];
+    if (result?.triggered_rules) {
+        // Flatten into a stream of { date, ruleName, ruleId }
+        const stream = [];
+        for (const day of result.triggered_rules) {
+            for (const r of day.rules || []) {
+                stream.push({ date: day.date, name: r.name || r.rule_id, id: r.rule_id });
+            }
+        }
+
+        // Group consecutive identical rules
+        let currentGroup = null;
+        for (const item of stream) {
+            if (!currentGroup || currentGroup.id !== item.id) {
+                if (currentGroup) groupedRules.push(currentGroup);
+                currentGroup = { id: item.id, name: item.name, startDate: item.date, endDate: item.date };
+            } else {
+                currentGroup.endDate = item.date;
+            }
+        }
+        if (currentGroup) groupedRules.push(currentGroup);
+    }
+
     return (
         <div>
             <div className="page-header">
@@ -204,17 +228,17 @@ export default function Simulate() {
                     </div>
 
                     {/* Triggered Rules */}
-                    {result.triggered_rules?.length > 0 && (
+                    {groupedRules.length > 0 && (
                         <div className="card mt-6">
-                            <h3 className="text-sm text-green mb-4">⚡ Advisory Rules Triggered ({result.triggered_rules.length})</h3>
-                            {result.triggered_rules.map((r, i) => (
+                            <h3 className="text-sm text-green mb-4">⚡ Advisory Rules Triggered ({groupedRules.length} periods)</h3>
+                            {groupedRules.map((grp, i) => (
                                 <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                                    <span className="badge badge-amber" style={{ marginRight: 10 }}>{r.date}</span>
-                                    {r.rules?.map((rule) => (
-                                        <span key={rule.rule_id} style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                            {rule.name || rule.rule_id}
-                                        </span>
-                                    ))}
+                                    <span className="badge badge-amber" style={{ marginRight: 10 }}>
+                                        {grp.startDate === grp.endDate ? grp.startDate : `${grp.startDate} to ${grp.endDate}`}
+                                    </span>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                        {grp.name}
+                                    </span>
                                 </div>
                             ))}
                         </div>
