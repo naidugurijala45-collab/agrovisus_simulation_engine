@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { getCropTemplates, runSimulation } from '../api/client';
 import LocationPicker from '../components/LocationPicker';
+import { exportElementToPDF } from '../utils/pdfExport';
 
 const DEFAULT_FORM = {
     crop_template: 'corn',
@@ -39,6 +40,7 @@ export default function Simulate() {
     const [error, setError] = useState(null);
 
     const abortControllerRef = useRef(null);
+    const reportRef = useRef(null);
 
     useEffect(() => {
         getCropTemplates()
@@ -83,6 +85,15 @@ export default function Simulate() {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
+    };
+
+    const handleExportPDF = async () => {
+        if (!reportRef.current) return;
+        const success = await exportElementToPDF(
+            reportRef.current,
+            `agrovisus-sim-report-${form.start_date || 'latest'}.pdf`
+        );
+        if (!success) setError('Failed to generate PDF. Please try again.');
     };
 
     // Helper to group contiguous rules
@@ -172,7 +183,14 @@ export default function Simulate() {
             )}
 
             {result && (
-                <>
+                <div ref={reportRef} style={{ background: 'var(--bg-primary)', padding: '20px 0' }}>
+                    {/* Hidden title that only shows up in the PDF export for context */}
+                    <div className="pdf-only-title" data-html2canvas-ignore="false" style={{ display: 'none', textAlign: 'right', marginBottom: 20 }}>
+                        <h2 style={{ margin: 0, color: 'var(--green-400)' }}>AgroVisus Platform</h2>
+                        <p style={{ margin: 0, color: 'var(--text-muted)' }}>Simulation Report: {templates.find(t => t.id === form.crop_template)?.name || form.crop_template}</p>
+                        <p style={{ margin: 0, color: 'var(--text-muted)' }}>Generated: {new Date().toLocaleDateString()}</p>
+                    </div>
+
                     {/* KPI Cards */}
                     <div className="card-grid card-grid-4 mb-4">
                         {[
@@ -277,7 +295,24 @@ export default function Simulate() {
                             ))}
                         </div>
                     )}
-                </>
+
+                    {/* ACTION BAR */}
+                    <div className="action-bar mt-8 flex justify-end gap-4" data-html2canvas-ignore="true">
+                        <button
+                            className="btn btn-outline"
+                            title="Save to Dashboard (Coming Soon)"
+                            onClick={() => alert("Cloud Sync is coming in an upcoming update! For now, please use the PDF export.")}
+                        >
+                            Save to Dashboard
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleExportPDF}
+                        >
+                            Download PDF Report
+                        </button>
+                    </div>
+                </div>
             )}
 
             <style>{`.spinning { animation: spin 1s linear infinite; }`}</style>

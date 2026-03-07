@@ -320,6 +320,20 @@ body {
   color: var(--green-400);
 }
 
+.action-bar {
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Ensure the action bar doesn't end up in the PDF */
+.action-bar[data-html2canvas-ignore] {
+  display: none !important;
+}
+
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 .form-group {
   display: flex;
