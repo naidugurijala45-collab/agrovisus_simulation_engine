@@ -228,7 +228,7 @@ export default function Landing() {
                         {
                             icon: '🌱', color: '#22c55e', glow: 'rgba(34,197,94,0.15)',
                             title: 'Crop Simulation Engine',
-                            desc: '91-day physics-based simulation with GDD accumulation, water balance, nutrient cycling, disease pressure, and daily stage tracking.',
+                            desc: 'Physics-based simulation with GDD accumulation, water balance, nutrient cycling, disease pressure, and daily stage tracking.',
                             tags: ['Biomass', 'Soil Water', 'Disease'],
                         },
                         {
