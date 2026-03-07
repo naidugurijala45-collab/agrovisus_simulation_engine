@@ -234,7 +234,7 @@ export default function Landing() {
                         {
                             icon: '🤖', color: '#a78bfa', glow: 'rgba(167,139,250,0.15)',
                             title: 'Reinforcement Learning Agent',
-                            desc: 'PPO v3 agent trained for 200,000 timesteps learns optimal irrigation and fertilisation schedules across randomised growing seasons.',
+                            desc: 'PPO v3 agent trained for 200,000 timesteps learns optimal irrigation and fertilization schedules across randomized growing seasons.',
                             tags: ['PPO', 'Stable-Baselines3', 'Reward Shaping'],
                         },
                         {
@@ -277,7 +277,7 @@ export default function Landing() {
                     {[
                         { num: '01', icon: '⚙️', title: 'Configure', desc: 'Choose your crop, field location, soil type, and season length.' },
                         { num: '02', icon: '🔬', title: 'Simulate', desc: 'Run a full-season growth model using live weather and soil data.' },
-                        { num: '03', icon: '🤖', title: 'Optimise', desc: 'AI finds the irrigation and fertilisation plan that maximises your yield.' },
+                        { num: '03', icon: '🤖', title: 'Optimize', desc: 'AI finds the irrigation and fertilization plan that maximizes your yield.' },
                         { num: '04', icon: '📈', title: 'Act', desc: 'Receive day-by-day field recommendations you can put to work immediately.' },
                     ].map((s, i) => (
                         <div key={s.num} className="how-step">
