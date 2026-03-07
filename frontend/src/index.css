@@ -329,11 +329,6 @@ body {
   align-items: center;
 }
 
-/* Ensure the action bar doesn't end up in the PDF */
-.action-bar[data-html2canvas-ignore] {
-  display: none !important;
-}
-
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 .form-group {
   display: flex;
