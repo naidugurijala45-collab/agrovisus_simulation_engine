@@ -18,6 +18,7 @@ import LocationPicker from '../components/LocationPicker';
 const DEFAULT_FORM = {
     crop_template: 'corn',
     sim_days: 91,
+    start_date: new Date().toISOString().split('T')[0],
     latitude: 40.0,
     longitude: -88.0,
     elevation_m: 100.0,
@@ -124,6 +125,10 @@ export default function Simulate() {
                             {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                             {templates.length === 0 && <option value="corn">Corn (default)</option>}
                         </select>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Start Date</label>
+                        <input className="form-input" type="date" name="start_date" value={form.start_date} onChange={handleChange} />
                     </div>
                     <div className="form-group">
                         <label className="form-label">Simulation Days</label>

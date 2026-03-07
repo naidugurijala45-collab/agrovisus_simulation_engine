@@ -44,6 +44,7 @@ class ManagementEvent(BaseModel):
 class SimulationRequest(BaseModel):
     crop_template: str = "corn"
     sim_days: int = 91
+    start_date: Optional[str] = None
     latitude: float = 40.0
     longitude: float = -88.0
     elevation_m: float = 100.0
@@ -138,7 +139,14 @@ def run_simulation(req: SimulationRequest):
         config = _build_config(req)
         service = SimulationService(config_data=config, project_root=str(ENGINE_ROOT))
 
-        start_date = date(2024, 4, 15)
+        if req.start_date:
+            try:
+                start_date = datetime.strptime(req.start_date, "%Y-%m-%d").date()
+            except ValueError:
+                start_date = date.today()
+        else:
+            start_date = date.today()
+            
         with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as tmp:
             tmp_path = tmp.name
 
