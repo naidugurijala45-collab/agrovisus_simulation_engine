@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Play, Square, XCircle } from 'lucide-react';
+import { AlertTriangle, Play, Square, TrendingUp, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
     Area,
@@ -23,6 +23,9 @@ const DEFAULT_FORM = {
     latitude: 40.0,
     longitude: -88.0,
     elevation_m: 100.0,
+    field_acres: 100,
+    treatment_cost_per_acre: 25,
+    commodity_price_usd_bu: '',
 };
 
 const CHART_STYLE = {
@@ -32,11 +35,187 @@ const CHART_STYLE = {
     color: 'var(--text-primary)',
 };
 
+const SEVERITY_COLOR = {
+    Low: { bg: 'var(--green-glow)', text: 'var(--green-400)', border: 'rgba(74,222,128,0.25)' },
+    Medium: { bg: 'var(--amber-glow)', text: 'var(--amber-400)', border: 'rgba(251,191,36,0.25)' },
+    High: { bg: 'var(--red-glow)', text: 'var(--red-400)', border: 'rgba(248,113,113,0.25)' },
+    Critical: { bg: 'var(--red-glow)', text: 'var(--red-400)', border: 'rgba(248,113,113,0.4)' },
+};
+
+const ROI_STRENGTH_COLOR = {
+    'Strong Buy': { text: 'var(--green-400)', bg: 'var(--green-glow)', border: 'rgba(74,222,128,0.25)' },
+    'Marginal': { text: 'var(--amber-400)', bg: 'var(--amber-glow)', border: 'rgba(251,191,36,0.25)' },
+    'Monitor Only': { text: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border)' },
+};
+
+function fmt$(n) { return `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
+function fmtDec(n, d = 1) { return Number(n).toFixed(d); }
+
+function RoiScenario({ label, data, highlight }) {
+    const pct = data?.roi_percent ?? 0;
+    const positive = pct >= 0;
+    return (
+        <div style={{
+            flex: 1,
+            padding: '10px 12px',
+            borderRadius: 8,
+            background: highlight ? 'rgba(74,222,128,0.07)' : 'rgba(255,255,255,0.02)',
+            border: highlight ? '1px solid rgba(74,222,128,0.2)' : '1px solid var(--border)',
+            textAlign: 'center',
+        }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+                {label}{highlight && ' ✦'}
+            </div>
+            <div style={{
+                fontSize: '1.15rem', fontWeight: 700,
+                color: positive ? 'var(--green-400)' : 'var(--red-400)',
+            }}>
+                {positive ? '+' : ''}{fmtDec(pct, 0)}%
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                {fmt$(data?.net_benefit_usd ?? 0)} net
+            </div>
+        </div>
+    );
+}
+
+function RuleCard({ group }) {
+    const sev = group.severity || 'Medium';
+    const sevStyle = SEVERITY_COLOR[sev] || SEVERITY_COLOR.Medium;
+    const roi = group.roi;
+    const strength = roi?.recommendation_strength;
+    const strengthStyle = ROI_STRENGTH_COLOR[strength] || ROI_STRENGTH_COLOR['Monitor Only'];
+
+    return (
+        <div style={{
+            background: 'var(--bg-primary)',
+            border: `1px solid ${sevStyle.border}`,
+            borderRadius: 12,
+            overflow: 'hidden',
+        }}>
+            {/* Header */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '14px 16px 12px',
+                borderBottom: '1px solid var(--border)',
+                flexWrap: 'wrap',
+            }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        {/* Severity badge */}
+                        <span style={{
+                            fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
+                            letterSpacing: '0.6px', padding: '3px 10px', borderRadius: 999,
+                            background: sevStyle.bg, color: sevStyle.text, border: `1px solid ${sevStyle.border}`,
+                        }}>
+                            {sev}
+                        </span>
+                        {/* Alert type chip */}
+                        {group.alert_type && (
+                            <span style={{
+                                fontSize: '0.68rem', color: 'var(--text-muted)',
+                                background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                                borderRadius: 999, padding: '3px 10px',
+                            }}>
+                                {group.alert_type}
+                            </span>
+                        )}
+                    </div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {group.name}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Active: {group.startDate === group.endDate
+                            ? group.startDate
+                            : `${group.startDate} → ${group.endDate}`}
+                    </div>
+                </div>
+
+                {/* Recommendation strength pill */}
+                {strength && (
+                    <div style={{
+                        padding: '6px 14px', borderRadius: 999,
+                        background: strengthStyle.bg, color: strengthStyle.text,
+                        border: `1px solid ${strengthStyle.border}`,
+                        fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', alignSelf: 'flex-start',
+                    }}>
+                        {strength === 'Strong Buy' ? '↑ ' : strength === 'Marginal' ? '→ ' : '↓ '}
+                        {strength}
+                    </div>
+                )}
+            </div>
+
+            {/* Recommendation text */}
+            {group.recommendation && (
+                <div style={{
+                    padding: '10px 16px',
+                    fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic',
+                    borderBottom: roi ? '1px solid var(--border)' : 'none',
+                }}>
+                    {group.recommendation}
+                </div>
+            )}
+
+            {/* ROI Block */}
+            {roi && (
+                <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Top metrics row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+                        {[
+                            { label: 'Revenue at Risk', value: `${fmt$(roi.revenue_at_risk_per_acre)}/acre`, sub: `${fmt$(roi.revenue_at_risk_total)} total`, color: 'var(--red-400)' },
+                            { label: 'Yield Loss', value: `${fmtDec(roi.estimated_yield_loss_bu_acre)} bu/acre`, sub: 'without treatment', color: 'var(--amber-400)' },
+                            { label: 'Treatment Cost', value: `${fmt$(roi.treatment_cost_total)} total`, sub: `${fmt$(roi.treatment_cost_total / Math.max(1, roi.revenue_at_risk_total / Math.max(0.01, roi.revenue_at_risk_per_acre)))}/acre`, color: 'var(--text-secondary)' },
+                        ].map(m => (
+                            <div key={m.label} style={{
+                                padding: '10px 12px', borderRadius: 8,
+                                background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
+                            }}>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>{m.label}</div>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: m.color }}>{m.value}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>{m.sub}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* ROI scenarios */}
+                    <div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <TrendingUp size={12} />
+                            Treatment ROI (by fungicide/treatment efficacy)
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <RoiScenario label="Low (50%)" data={roi.treatment_roi?.low} />
+                            <RoiScenario label="Medium (70%)" data={roi.treatment_roi?.medium} highlight />
+                            <RoiScenario label="High (90%)" data={roi.treatment_roi?.high} />
+                        </div>
+                    </div>
+
+                    {/* Breakeven */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 12px', borderRadius: 8,
+                        background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
+                        fontSize: '0.78rem', color: 'var(--text-muted)',
+                    }}>
+                        <AlertTriangle size={13} color="var(--amber-400)" />
+                        Treatment breaks even at <strong style={{ color: 'var(--text-secondary)', margin: '0 4px' }}>
+                            {fmtDec(roi.breakeven_yield_loss_percent, 1)}% yield loss
+                        </strong> (medium efficacy assumption)
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function Simulate() {
     const [form, setForm] = useState(() => {
         try {
             const saved = sessionStorage.getItem('agrovisus_sim_form');
-            return saved ? JSON.parse(saved) : DEFAULT_FORM;
+            return saved ? { ...DEFAULT_FORM, ...JSON.parse(saved) } : DEFAULT_FORM;
         } catch {
             return DEFAULT_FORM;
         }
@@ -56,26 +235,15 @@ export default function Simulate() {
     const abortControllerRef = useRef(null);
     const reportRef = useRef(null);
 
-    // Sync form to session storage
     useEffect(() => {
-        try {
-            sessionStorage.setItem('agrovisus_sim_form', JSON.stringify(form));
-        } catch (e) {
-            console.error('Failed to save form to session storage', e);
-        }
+        try { sessionStorage.setItem('agrovisus_sim_form', JSON.stringify(form)); } catch {}
     }, [form]);
 
-    // Sync result to session storage
     useEffect(() => {
         try {
-            if (result) {
-                sessionStorage.setItem('agrovisus_sim_result', JSON.stringify(result));
-            } else {
-                sessionStorage.removeItem('agrovisus_sim_result');
-            }
-        } catch (e) {
-            console.error('Failed to save result to session storage', e);
-        }
+            if (result) sessionStorage.setItem('agrovisus_sim_result', JSON.stringify(result));
+            else sessionStorage.removeItem('agrovisus_sim_result');
+        } catch {}
     }, [result]);
 
     useEffect(() => {
@@ -86,7 +254,7 @@ export default function Simulate() {
 
     const handleChange = (e) => {
         const { name, value, type } = e.target;
-        setForm((f) => ({ ...f, [name]: type === 'number' ? parseFloat(value) : value }));
+        setForm((f) => ({ ...f, [name]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value }));
     };
 
     const handleLocationChange = (lat, lng) => {
@@ -98,62 +266,62 @@ export default function Simulate() {
         setError(null);
         setResult(null);
         abortControllerRef.current = new AbortController();
-
         try {
-            const data = await runSimulation(
-                { ...form, management_schedule: [] },
-                { signal: abortControllerRef.current.signal }
-            );
+            const payload = {
+                ...form,
+                management_schedule: [],
+                field_acres: parseFloat(form.field_acres) || 100,
+                treatment_cost_per_acre: parseFloat(form.treatment_cost_per_acre) || 25,
+                commodity_price_usd_bu: form.commodity_price_usd_bu !== '' ? parseFloat(form.commodity_price_usd_bu) : null,
+            };
+            const data = await runSimulation(payload, { signal: abortControllerRef.current.signal });
             setResult(data);
         } catch (e) {
-            if (axios.isCancel(e)) {
-                setError('Simulation cancelled by user.');
-            } else {
-                setError(e.response?.data?.detail || e.message || 'Simulation failed');
-            }
+            if (axios.isCancel(e)) setError('Simulation cancelled.');
+            else setError(e.response?.data?.detail || e.message || 'Simulation failed');
         } finally {
             setLoading(false);
             abortControllerRef.current = null;
         }
     };
 
-    const handleCancel = () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-    };
+    const handleCancel = () => abortControllerRef.current?.abort();
 
     const handleExportPDF = async () => {
         if (!reportRef.current) return;
-        const success = await exportElementToPDF(
-            reportRef.current,
-            `agrovisus-sim-report-${form.start_date || 'latest'}.pdf`
-        );
-        if (!success) setError('Failed to generate PDF. Please try again.');
+        const ok = await exportElementToPDF(reportRef.current, `agrovisus-sim-report-${form.start_date || 'latest'}.pdf`);
+        if (!ok) setError('Failed to generate PDF.');
     };
 
-    // Helper to group contiguous rules
+    // Build grouped rules with full rule data attached
     const groupedRules = [];
     if (result?.triggered_rules) {
-        // Flatten into a stream of { date, ruleName, ruleId }
         const stream = [];
         for (const day of result.triggered_rules) {
             for (const r of day.rules || []) {
-                stream.push({ date: day.date, name: r.name || r.rule_id, id: r.rule_id });
+                stream.push({ date: day.date, rule: r });
             }
         }
-
-        // Group consecutive identical rules
-        let currentGroup = null;
+        let current = null;
         for (const item of stream) {
-            if (!currentGroup || currentGroup.id !== item.id) {
-                if (currentGroup) groupedRules.push(currentGroup);
-                currentGroup = { id: item.id, name: item.name, startDate: item.date, endDate: item.date };
+            const id = item.rule.rule_id;
+            if (!current || current.id !== id) {
+                if (current) groupedRules.push(current);
+                current = {
+                    id,
+                    name: item.rule.name || id,
+                    severity: item.rule.severity,
+                    alert_type: item.rule.alert_type,
+                    recommendation: item.rule.recommendation,
+                    roi: item.rule.roi,
+                    startDate: item.date,
+                    endDate: item.date,
+                };
             } else {
-                currentGroup.endDate = item.date;
+                current.endDate = item.date;
             }
         }
-        if (currentGroup) groupedRules.push(currentGroup);
+        if (current) groupedRules.push(current);
     }
 
     return (
@@ -165,7 +333,7 @@ export default function Simulate() {
 
             {/* Config Form */}
             <div className="card mb-4">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 16 }}>
                     <div className="form-group">
                         <label className="form-label">Crop Template</label>
                         <select className="form-select" name="crop_template" value={form.crop_template} onChange={handleChange}>
@@ -190,16 +358,38 @@ export default function Simulate() {
                     </div>
                 </div>
 
+                {/* ROI Inputs */}
+                <div style={{
+                    display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
+                    gap: 16, marginBottom: 20,
+                    padding: '14px 16px', borderRadius: 10,
+                    background: 'rgba(74,222,128,0.04)', border: '1px solid rgba(74,222,128,0.12)',
+                }}>
+                    <div style={{ gridColumn: '1/-1', fontSize: '0.75rem', fontWeight: 600, color: 'var(--green-400)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>
+                        ROI Parameters
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Field Size (acres)</label>
+                        <input className="form-input" type="number" name="field_acres" value={form.field_acres} onChange={handleChange} min={1} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Treatment Cost ($/acre)</label>
+                        <input className="form-input" type="number" name="treatment_cost_per_acre" value={form.treatment_cost_per_acre} onChange={handleChange} min={0} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Commodity Price ($/bu) <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>optional</span></label>
+                        <input className="form-input" type="number" name="commodity_price_usd_bu" value={form.commodity_price_usd_bu} onChange={handleChange} min={0} step={0.01} placeholder="e.g. 4.50 for corn" />
+                    </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 12 }}>
                     {!loading ? (
                         <button className="btn btn-primary" onClick={handleRun}>
-                            <Play size={16} />
-                            Run Simulation
+                            <Play size={16} /> Run Simulation
                         </button>
                     ) : (
                         <button className="btn" style={{ background: 'var(--red-glow)', border: '1px solid var(--red-400)', color: 'var(--red-400)' }} onClick={handleCancel}>
-                            <Square size={16} fill="var(--red-400)" />
-                            Stop Simulation
+                            <Square size={16} fill="var(--red-400)" /> Stop Simulation
                         </button>
                     )}
                 </div>
@@ -220,8 +410,7 @@ export default function Simulate() {
 
             {result && (
                 <div ref={reportRef} style={{ background: 'var(--bg-primary)', padding: '20px 0' }}>
-                    {/* Hidden title that only shows up in the PDF export for context */}
-                    <div className="pdf-only-title" data-html2canvas-ignore="false" style={{ display: 'none', textAlign: 'right', marginBottom: 20 }}>
+                    <div className="pdf-only-title" style={{ display: 'none' }}>
                         <h2 style={{ margin: 0, color: 'var(--green-400)' }}>AgroVisus Platform</h2>
                         <p style={{ margin: 0, color: 'var(--text-muted)' }}>Simulation Report: {templates.find(t => t.id === form.crop_template)?.name || form.crop_template}</p>
                         <p style={{ margin: 0, color: 'var(--text-muted)' }}>Generated: {new Date().toLocaleDateString()}</p>
@@ -315,52 +504,53 @@ export default function Simulate() {
                         </div>
                     </div>
 
-                    {/* Triggered Rules */}
+                    {/* Triggered Rules with ROI */}
                     {groupedRules.length > 0 && (
                         <div className="card mt-6">
-                            <h3 className="text-sm text-green mb-4">⚡ Advisory Rules Triggered ({groupedRules.length} periods)</h3>
-                            {groupedRules.map((grp, i) => (
-                                <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                                    <span className="badge badge-amber" style={{ marginRight: 10 }}>
-                                        {grp.startDate === grp.endDate ? grp.startDate : `${grp.startDate} to ${grp.endDate}`}
-                                    </span>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                        {grp.name}
-                                    </span>
-                                </div>
-                            ))}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                                <h3 className="text-sm text-green">
+                                    ⚡ Advisory Alerts — {groupedRules.length} rule{groupedRules.length > 1 ? 's' : ''} triggered
+                                </h3>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                    {form.field_acres} acres · ${form.treatment_cost_per_acre}/acre treatment cost
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {groupedRules.map((grp, i) => <RuleCard key={i} group={grp} />)}
+                            </div>
+                        </div>
+                    )}
+
+                    {groupedRules.length === 0 && (
+                        <div className="card mt-6" style={{ textAlign: 'center', padding: '32px 24px' }}>
+                            <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>✅</div>
+                            <div style={{ color: 'var(--green-400)', fontWeight: 600, marginBottom: 4 }}>No advisory alerts triggered</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Conditions stayed within acceptable thresholds throughout the simulation.</div>
                         </div>
                     )}
 
                     {/* ACTION BAR */}
-                    <div className="action-bar mt-8 flex justify-end gap-4" data-html2canvas-ignore="true">
+                    <div className="action-bar mt-8" data-html2canvas-ignore="true">
                         <button
                             className="btn btn-outline"
                             style={{ borderColor: 'var(--red-400)', color: 'var(--red-400)' }}
                             onClick={() => setResult(null)}
-                            title="Clear these results from the screen"
                         >
                             <XCircle size={18} /> Clear Results
                         </button>
-                        <div style={{ flexGrow: 1 }} /> {/* Spacer */}
+                        <div style={{ flexGrow: 1 }} />
                         <button
                             className="btn btn-outline"
-                            title="Save to Dashboard (Coming Soon)"
-                            onClick={() => alert("Cloud Sync is coming in an upcoming update! For now, please use the PDF export.")}
+                            onClick={() => alert('Cloud Sync is coming in an upcoming update! For now, please use the PDF export.')}
                         >
                             Save to Dashboard
                         </button>
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleExportPDF}
-                        >
+                        <button className="btn btn-primary" onClick={handleExportPDF}>
                             Download PDF Report
                         </button>
                     </div>
                 </div>
             )}
-
-            <style>{`.spinning { animation: spin 1s linear infinite; }`}</style>
         </div>
     );
 }
