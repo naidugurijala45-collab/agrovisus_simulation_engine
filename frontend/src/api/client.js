@@ -7,8 +7,8 @@ const api = axios.create({
     timeout: 120000,
 });
 
-export const runSimulation = (payload) =>
-    api.post('/simulation/run', payload).then((r) => r.data);
+export const runSimulation = (payload, config = {}) =>
+    api.post('/simulation/run', payload, config).then((r) => r.data);
 
 export const getCropTemplates = () =>
     api.get('/crops/templates').then((r) => r.data);

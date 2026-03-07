@@ -1,5 +1,6 @@
-import { Loader2, Play } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Play, Square } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Area,
     AreaChart,
@@ -12,6 +13,7 @@ import {
     XAxis, YAxis,
 } from 'recharts';
 import { getCropTemplates, runSimulation } from '../api/client';
+import LocationPicker from '../components/LocationPicker';
 
 const DEFAULT_FORM = {
     crop_template: 'corn',
@@ -35,6 +37,8 @@ export default function Simulate() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const abortControllerRef = useRef(null);
+
     useEffect(() => {
         getCropTemplates()
             .then((d) => setTemplates(d.templates || []))
@@ -46,17 +50,37 @@ export default function Simulate() {
         setForm((f) => ({ ...f, [name]: type === 'number' ? parseFloat(value) : value }));
     };
 
+    const handleLocationChange = (lat, lng) => {
+        setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+    };
+
     const handleRun = async () => {
         setLoading(true);
         setError(null);
         setResult(null);
+        abortControllerRef.current = new AbortController();
+
         try {
-            const data = await runSimulation({ ...form, management_schedule: [] });
+            const data = await runSimulation(
+                { ...form, management_schedule: [] },
+                { signal: abortControllerRef.current.signal }
+            );
             setResult(data);
         } catch (e) {
-            setError(e.response?.data?.detail || e.message || 'Simulation failed');
+            if (axios.isCancel(e)) {
+                setError('Simulation cancelled by user.');
+            } else {
+                setError(e.response?.data?.detail || e.message || 'Simulation failed');
+            }
         } finally {
             setLoading(false);
+            abortControllerRef.current = null;
+        }
+    };
+
+    const handleCancel = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
         }
     };
 
@@ -105,23 +129,28 @@ export default function Simulate() {
                         <label className="form-label">Simulation Days</label>
                         <input className="form-input" type="number" name="sim_days" value={form.sim_days} onChange={handleChange} min={10} max={365} />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">Latitude (°)</label>
-                        <input className="form-input" type="number" name="latitude" value={form.latitude} onChange={handleChange} step={0.1} />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Longitude (°)</label>
-                        <input className="form-input" type="number" name="longitude" value={form.longitude} onChange={handleChange} step={0.1} />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Elevation (m)</label>
-                        <input className="form-input" type="number" name="elevation_m" value={form.elevation_m} onChange={handleChange} />
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label className="form-label" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Field Location</span>
+                            <span className="text-muted">Lat: {form.latitude.toFixed(4)}, Lng: {form.longitude.toFixed(4)}</span>
+                        </label>
+                        <LocationPicker lat={form.latitude} lng={form.longitude} onChange={handleLocationChange} />
                     </div>
                 </div>
-                <button className="btn btn-primary" onClick={handleRun} disabled={loading}>
-                    {loading ? <Loader2 size={16} className="spinning" /> : <Play size={16} />}
-                    {loading ? 'Simulating…' : 'Run Simulation'}
-                </button>
+
+                <div style={{ display: 'flex', gap: 12 }}>
+                    {!loading ? (
+                        <button className="btn btn-primary" onClick={handleRun}>
+                            <Play size={16} />
+                            Run Simulation
+                        </button>
+                    ) : (
+                        <button className="btn" style={{ background: 'var(--red-glow)', border: '1px solid var(--red-400)', color: 'var(--red-400)' }} onClick={handleCancel}>
+                            <Square size={16} fill="var(--red-400)" />
+                            Stop Simulation
+                        </button>
+                    )}
+                </div>
             </div>
 
             {error && (
