@@ -19,6 +19,7 @@ sys.path.insert(0, str(ENGINE_ROOT))
 
 from app.services.simulation_service import SimulationService
 from app.utils.exceptions import ConfigValidationError, ModelInitError, SimulationError
+from backend.app.services.roi_calculator import enrich_rule_with_roi
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,6 +50,9 @@ class SimulationRequest(BaseModel):
     longitude: float = -88.0
     elevation_m: float = 100.0
     management_schedule: List[ManagementEvent] = []
+    field_acres: float = 100.0
+    treatment_cost_per_acre: float = 25.0
+    commodity_price_usd_bu: Optional[float] = None
 
 
 class DailyDataPoint(BaseModel):
@@ -170,6 +174,27 @@ def run_simulation(req: SimulationRequest):
             harvest_index = config.get("crop_model_config", {}).get("harvest_index", 0.5)
             actual_yield = result.get("total_biomass_kg_ha", 0.0) * harvest_index
 
+        # Enrich disease / nutrient rules with ROI analysis
+        ROI_ALERT_TYPES = {"disease", "nutrient", "foliar", "deficiency", "stress", "risk"}
+        raw_rules = result.get("triggered_rules", [])
+        enriched_rules = []
+        for day_entry in raw_rules:
+            enriched_day = dict(day_entry)
+            enriched_rules_list = []
+            for rule in day_entry.get("rules", []):
+                alert_type = rule.get("alert_type", "").lower()
+                if any(kw in alert_type for kw in ROI_ALERT_TYPES):
+                    rule = enrich_rule_with_roi(
+                        rule=rule,
+                        crop_type=req.crop_template,
+                        field_acres=req.field_acres,
+                        treatment_cost_per_acre=req.treatment_cost_per_acre,
+                        current_commodity_price=req.commodity_price_usd_bu,
+                    )
+                enriched_rules_list.append(rule)
+            enriched_day["rules"] = enriched_rules_list
+            enriched_rules.append(enriched_day)
+
         return SimulationResult(
             total_biomass_kg_ha=result.get("total_biomass_kg_ha", 0.0),
             final_yield_kg_ha=actual_yield,
@@ -177,7 +202,7 @@ def run_simulation(req: SimulationRequest):
             total_precipitation_mm=total_precip,
             max_disease_severity=max_disease,
             daily_data=daily_data,
-            triggered_rules=result.get("triggered_rules", []),
+            triggered_rules=enriched_rules,
         )
 
     except (ConfigValidationError, ModelInitError) as e:
