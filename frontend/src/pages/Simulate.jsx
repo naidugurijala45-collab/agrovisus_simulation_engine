@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Play, Square } from 'lucide-react';
+import { Play, Square, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
     Area,
@@ -33,14 +33,50 @@ const CHART_STYLE = {
 };
 
 export default function Simulate() {
-    const [form, setForm] = useState(DEFAULT_FORM);
+    const [form, setForm] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('agrovisus_sim_form');
+            return saved ? JSON.parse(saved) : DEFAULT_FORM;
+        } catch {
+            return DEFAULT_FORM;
+        }
+    });
     const [templates, setTemplates] = useState([]);
-    const [result, setResult] = useState(null);
+    const [result, setResult] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('agrovisus_sim_result');
+            return saved ? JSON.parse(saved) : null;
+        } catch {
+            return null;
+        }
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const abortControllerRef = useRef(null);
     const reportRef = useRef(null);
+
+    // Sync form to session storage
+    useEffect(() => {
+        try {
+            sessionStorage.setItem('agrovisus_sim_form', JSON.stringify(form));
+        } catch (e) {
+            console.error('Failed to save form to session storage', e);
+        }
+    }, [form]);
+
+    // Sync result to session storage
+    useEffect(() => {
+        try {
+            if (result) {
+                sessionStorage.setItem('agrovisus_sim_result', JSON.stringify(result));
+            } else {
+                sessionStorage.removeItem('agrovisus_sim_result');
+            }
+        } catch (e) {
+            console.error('Failed to save result to session storage', e);
+        }
+    }, [result]);
 
     useEffect(() => {
         getCropTemplates()
@@ -298,6 +334,15 @@ export default function Simulate() {
 
                     {/* ACTION BAR */}
                     <div className="action-bar mt-8 flex justify-end gap-4" data-html2canvas-ignore="true">
+                        <button
+                            className="btn btn-outline"
+                            style={{ borderColor: 'var(--red-400)', color: 'var(--red-400)' }}
+                            onClick={() => setResult(null)}
+                            title="Clear these results from the screen"
+                        >
+                            <XCircle size={18} /> Clear Results
+                        </button>
+                        <div style={{ flexGrow: 1 }} /> {/* Spacer */}
                         <button
                             className="btn btn-outline"
                             title="Save to Dashboard (Coming Soon)"
