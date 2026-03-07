@@ -9,9 +9,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add simulation engine to path
-ENGINE_ROOT = Path(__file__).parent.parent / "engine"
+# Add simulation engine and project root to path
+PROJECT_ROOT = Path(__file__).parent.parent
+ENGINE_ROOT = PROJECT_ROOT / "engine"
 sys.path.insert(0, str(ENGINE_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT))  # Needed for 'from backend...' to work on Render
 
 from backend.routers import simulation, disease, crops
 
