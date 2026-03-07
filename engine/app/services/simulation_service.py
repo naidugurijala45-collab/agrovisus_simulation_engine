@@ -259,14 +259,20 @@ class SimulationService:
                 temp_max=self._safe_float(self.nutrient_config.get("temp_max"), 40.0)
             )
 
-            # Disease Model — use first disease from template if available
-            disease_cfg = self.disease_config
-            if full_template and not disease_cfg:
-                diseases = full_template.get("diseases", [])
-                if diseases:
-                    disease_cfg = diseases[0]
-                    self.logger.info(f"Using template disease: {disease_cfg.get('name', 'unknown')}")
-            self.disease_model = DiseaseModel(config=disease_cfg)
+            # Disease Models — one per disease in the template
+            if full_template and full_template.get("diseases"):
+                template_diseases = full_template["diseases"]
+                self.disease_models = [DiseaseModel(config=d) for d in template_diseases]
+                self.logger.info(
+                    f"Loaded {len(self.disease_models)} disease model(s): "
+                    + ", ".join(d.get("name", d.get("id", "?")) for d in template_diseases)
+                )
+            else:
+                # Fall back to single model from config
+                self.disease_models = [DiseaseModel(config=self.disease_config)]
+                self.logger.info("Using single disease model from config.")
+            # Keep singular alias for ReportingService compatibility
+            self.disease_model = self.disease_models[0]
 
             # Rule Engine
             rule_path = self._resolve_path(self.config.get("rule_path", "rules.json"))
@@ -274,7 +280,7 @@ class SimulationService:
 
             # Reporting Service
             self.reporting_service = ReportingService(
-                self.data_manager, self.soil_model, self.crop_model, 
+                self.data_manager, self.soil_model, self.crop_model,
                 self.nutrient_model, self.disease_model, self.rule_evaluator
             )
         
@@ -435,14 +441,23 @@ class SimulationService:
                 calculated_lwd_hours = calculate_leaf_wetness_duration(hourly_weather_list) if hourly_weather_list else 0.0
 
                 disease_weather_input = {'avg_temp_c': avg_temp_numeric}
-                self.disease_model.update_daily(
-                    daily_weather=disease_weather_input,
-                    hourly_weather=hourly_weather_list,
-                    crop_growth_stage=crop_status_before_update['current_stage'],
-                    crop_lai=crop_status_before_update.get('lai', 0.0),
-                    crop_non_disease_stress_factor=non_disease_stress
-                )
-                disease_status = self.disease_model.get_current_state()
+                for dm in self.disease_models:
+                    dm.update_daily(
+                        daily_weather=disease_weather_input,
+                        hourly_weather=hourly_weather_list,
+                        crop_growth_stage=crop_status_before_update['current_stage'],
+                        crop_lai=crop_status_before_update.get('lai', 0.0),
+                        crop_non_disease_stress_factor=non_disease_stress
+                    )
+                # Aggregate: worst-case severity and stress across all diseases
+                all_states = [dm.get_current_state() for dm in self.disease_models]
+                worst = max(all_states, key=lambda s: s['disease_severity'])
+                disease_status = {
+                    'disease_severity': worst['disease_severity'],
+                    'disease_severity_percent': worst['disease_severity'] * 100,
+                    'latent_infections': worst['latent_infections'],
+                    'disease_stress_factor': min(s['disease_stress_factor'] for s in all_states),
+                }
                 disease_stress_factor = disease_status['disease_stress_factor']
 
                 self.crop_model.update_daily(min_temp_numeric, max_temp_numeric, solar_rad_today, actual_n_uptake_today, soil_status_dict, disease_stress_factor)

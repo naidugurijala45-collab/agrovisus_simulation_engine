@@ -77,16 +77,22 @@ class ET0Service:
             ET0 value in mm/day
         """
         use_method = method or self.default_method
-        
+
         if use_method not in self.VALID_METHODS:
             logger.warning(f"Invalid method '{use_method}', using default")
             use_method = self.default_method
-        
+
+        # pyet requires a plain integer day-of-year, not a date/Timestamp
+        if isinstance(day_of_year, int):
+            doy = day_of_year
+        else:
+            doy = day_of_year.timetuple().tm_yday
+
         try:
             if use_method == "hargreaves":
-                return self._calculate_hargreaves(weather_data, location, day_of_year)
+                return self._calculate_hargreaves(weather_data, location, doy)
             else:
-                return self._calculate_penman_monteith(weather_data, location, day_of_year)
+                return self._calculate_penman_monteith(weather_data, location, doy)
         except Exception as e:
             logger.error(f"ET0 calculation failed: {e}", exc_info=True)
             return self.fallback_value
@@ -95,7 +101,7 @@ class ET0Service:
         self,
         weather_data: Dict[str, float],
         location: Dict[str, float],
-        day_of_year: date
+        day_of_year: int
     ) -> float:
         """
         Calculate ET0 using Hargreaves equation.
@@ -128,7 +134,7 @@ class ET0Service:
         self,
         weather_data: Dict[str, float],
         location: Dict[str, float],
-        day_of_year: date
+        day_of_year: int
     ) -> float:
         """
         Calculate ET0 using FAO-56 Penman-Monteith equation.

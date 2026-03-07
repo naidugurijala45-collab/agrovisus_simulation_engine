@@ -1,72 +1,71 @@
 {
   "rules": [
     {
-      "id": "Drought_Stress_Risk",
-      "name": "Potential Drought Stress",
+      "id": "NCLB_Risk",
+      "name": "Northern Corn Leaf Blight Risk",
       "conditions": [
-        {
-          "path": "soil.fraction_awc",
-          "operator": "less_than",
-          "threshold": 0.35
-        }
+        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 18.0 },
+        { "path": "weather.current_temp_c", "operator": "less_than",    "threshold": 27.0 },
+        { "path": "weather.humidity_percent", "operator": "greater_than", "threshold": 85.0 },
+        { "path": "weather.leaf_wetness_hours", "operator": "greater_than", "threshold": 6.0 }
       ],
       "result": {
         "severity": "High",
-        "alert_type": "Drought Stress",
-        "recommendation": "Soil moisture is critically low. Immediate irrigation is recommended to prevent yield loss."
+        "alert_type": "Foliar Disease Risk",
+        "recommendation": "Conditions favour Northern Corn Leaf Blight. Scout for cigar-shaped lesions and apply foliar fungicide if >5% leaf area affected."
       }
     },
     {
-      "id": "Low_Nitrogen_Warning",
-      "name": "Low Soil Nitrogen",
+      "id": "GLS_Risk",
+      "name": "Gray Leaf Spot Risk",
       "conditions": [
-        {
-          "path": "nutrients.available_N_kg_ha",
-          "operator": "less_than",
-          "threshold": 15.0
-        },
-        {
-          "path": "crop.stage",
-          "operator": "not_in",
-          "threshold": ["R6"]
-        }
+        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 22.0 },
+        { "path": "weather.humidity_percent", "operator": "greater_than", "threshold": 90.0 },
+        { "path": "weather.leaf_wetness_hours", "operator": "greater_than", "threshold": 8.0 }
+      ],
+      "result": {
+        "severity": "High",
+        "alert_type": "Foliar Disease Risk",
+        "recommendation": "High Gray Leaf Spot risk. Extended leaf wetness with warm nights — consider fungicide application at VT/R1."
+      }
+    },
+    {
+      "id": "Common_Rust_Risk",
+      "name": "Common Rust Risk",
+      "conditions": [
+        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 15.0 },
+        { "path": "weather.current_temp_c", "operator": "less_than",    "threshold": 25.0 },
+        { "path": "weather.humidity_percent", "operator": "greater_than", "threshold": 80.0 }
+      ],
+      "result": {
+        "severity": "Moderate",
+        "alert_type": "Foliar Disease Risk",
+        "recommendation": "Conditions are suitable for Common Rust development. Scout for brick-red pustules on leaves and monitor closely through silking."
+      }
+    },
+    {
+      "id": "Nitrogen_Deficiency",
+      "name": "Nitrogen Deficiency Warning",
+      "conditions": [
+        { "path": "nutrients.available_N_kg_ha", "operator": "less_than", "threshold": 20.0 },
+        { "path": "crop.current_stage", "operator": "not_in", "threshold": ["R6"] }
       ],
       "result": {
         "severity": "Moderate",
         "alert_type": "Nutrient Stress",
-        "recommendation": "Available Nitrogen is low for the current growth stage. Consider top-dressing with N fertilizer."
+        "recommendation": "Available nitrogen is below 20 kg/ha. Apply top-dress nitrogen fertiliser to avoid yield penalty, especially before V6."
       }
     },
     {
-      "id": "Moderate_Foliar_Disease_Risk_LWD",
-      "name": "Potential Moderate Foliar Disease Risk (from Leaf Wetness)",
+      "id": "Drought_Stress",
+      "name": "Drought Stress Alert",
       "conditions": [
-        {
-          "path": "weather.leaf_wetness_hours",
-          "operator": "greater_than",
-          "threshold": 8.0
-        }
+        { "path": "soil.fraction_awc", "operator": "less_than", "threshold": 0.3 }
       ],
       "result": {
-        "severity": "Moderate",
-        "alert_type": "Foliar Disease Risk",
-        "recommendation": "Conditions are moderately favorable for foliar disease. Increase scouting frequency."
-      }
-    },
-    {
-      "id": "Low_Foliar_Disease_Pressure_LWD",
-      "name": "Low Foliar Disease Pressure (from Leaf Wetness)",
-      "conditions": [
-        {
-          "path": "weather.leaf_wetness_hours",
-          "operator": "less_than",
-          "threshold": 4.0
-        }
-      ],
-      "result": {
-        "severity": "Low",
-        "alert_type": "Foliar Disease Risk",
-        "recommendation": "Leaf wetness duration is low, reducing general risk for many foliar diseases."
+        "severity": "High",
+        "alert_type": "Drought Stress",
+        "recommendation": "Soil moisture is critically low (< 30% AWC). Irrigate immediately to prevent irreversible yield loss, particularly during pollination."
       }
     }
   ]
