@@ -354,6 +354,39 @@ body {
   box-shadow: 0 0 0 3px var(--green-glow);
 }
 
+/* Date Input Specifics */
+input[type="date"] {
+  position: relative;
+  /* Make text visible with a consistent color */
+  color: var(--text-primary);
+}
+
+/* Style the native browser calendar picker icon */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  background: transparent;
+  bottom: 0;
+  color: transparent;
+  cursor: pointer;
+  height: auto;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: auto;
+  /* Add our own custom SVG icon as a background image */
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="15" viewBox="0 0 24 24" fill="none" stroke="%234ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
+  background-repeat: no-repeat;
+  background-position: calc(100% - 10px) center;
+  background-size: 16px;
+  /* Ensure it doesn't get hidden */
+  opacity: 1;
+}
+
+/* Ensure the wrapper respects the icon width */
+.form-group input[type="date"] {
+  padding-right: 36px;
+}
+
 /* ── Page Headers ───────────────────────────────────────────────────────── */
 .page-header {
   margin-bottom: 28px;
