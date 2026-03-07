@@ -24,38 +24,59 @@ export const exportElementToPDF = async (elementRef, filename = 'agrovisus-repor
         // 2. Convert canvas to base64 image
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-        // 3. Calculate PDF dimensions
-        // A4 Paper: 210mm x 297mm
+        // 3. Determine PDF orientation dynamically based on screen width
+        // If the screen is wider than it is tall (like a desktop), use landscape paper.
+        // If it's a mobile phone (taller than wide), use portrait paper.
+        const originalWidth = canvas.width;
+        const originalHeight = canvas.height;
+        const orientation = originalWidth > originalHeight ? 'landscape' : 'portrait';
+
         const pdf = new jsPDF({
-            orientation: 'portrait',
+            orientation: orientation,
             unit: 'mm',
             format: 'a4'
         });
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
+        // 4. Calculate smart scaling to fit within page with margins
+        const MARGIN_MM = 15; // 15mm border around the whole page
+        const pdfWidth = pdf.internal.pageSize.getWidth() - (MARGIN_MM * 2);
+        const pdfHeight = pdf.internal.pageSize.getHeight() - (MARGIN_MM * 2);
 
-        // Calculate the height of the image on the PDF based on the aspect ratio
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        // Figure out if we need to scale by width or height
+        const ratioCanvas = originalWidth / originalHeight;
+        const ratioPdf = pdfWidth / pdfHeight;
 
-        // 4. Handle multi-page pagination if the report is too long
-        let heightLeft = imgHeight;
-        let position = 0;
+        let printWidth, printHeight;
 
-        // Add first page
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+        if (ratioCanvas > ratioPdf) {
+            // Screen is wider than PDF (it will hit left/right boundaries first)
+            printWidth = pdfWidth;
+            printHeight = pdfWidth / ratioCanvas;
+        } else {
+            // Screen is taller than PDF (it will hit top/bottom boundaries first)
+            printHeight = pdfHeight;
+            printWidth = pdfHeight * ratioCanvas;
+        }
+
+        // 5. Center align horizontally
+        const xOffset = MARGIN_MM + ((pdfWidth - printWidth) / 2);
+        const yOffset = MARGIN_MM; // Snap to top with margin
+
+        // 6. Handle multi-page pagination (if it somehow still bleeds over)
+        let heightLeft = printHeight;
+        let position = yOffset;
+
+        pdf.addImage(imgData, 'JPEG', xOffset, position, printWidth, printHeight);
         heightLeft -= pdfHeight;
 
-        // Add subsequent pages if the content bleeds over
-        while (heightLeft >= 0) {
-            position = heightLeft - imgHeight;
+        while (heightLeft > 0) {
+            position = heightLeft - printHeight + MARGIN_MM;
             pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+            pdf.addImage(imgData, 'JPEG', xOffset, position, printWidth, printHeight);
             heightLeft -= pdfHeight;
         }
 
-        // 5. Trigger download
+        // 7. Trigger download
         pdf.save(filename);
         return true;
 
