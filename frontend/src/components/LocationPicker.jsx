@@ -92,7 +92,7 @@ export default function LocationPicker({ lat, lng, onChange, resolved }) {
                                 colorBackgroundHover: '#141e17',
                                 colorBackgroundActive: '#141e17',
                                 colorText: '#f0fdf4',
-                                colorTextSecondary: '#4b7a5e',
+                                colorTextSecondary: '#86efac',
                                 colorPrimary: '#4ade80',
                                 colorSecondary: '#22c55e',
                                 border: '1px solid #1f3028',
@@ -102,6 +102,29 @@ export default function LocationPicker({ lat, lng, onChange, resolved }) {
                             },
                         }}
                     />
+                    {/* Force light text on the shadow-DOM input — CSS vars pierce shadow boundaries */}
+                    <style>{`
+                        mapbox-search-box,
+                        mapbox-search-box * {
+                            --color-text: #f0fdf4 !important;
+                            --color-background: #0a0f0d !important;
+                            --color-background-hover: #141e17 !important;
+                        }
+                        mapbox-search-box input,
+                        mapbox-search-box textarea {
+                            color: #f0fdf4 !important;
+                            background: #0a0f0d !important;
+                            caret-color: #4ade80 !important;
+                        }
+                        .mbx-input,
+                        .mapboxgl-ctrl-geocoder input,
+                        [class*="SearchBox"] input,
+                        [class*="search-box"] input {
+                            color: #f0fdf4 !important;
+                            background: #0a0f0d !important;
+                            caret-color: #4ade80 !important;
+                        }
+                    `}</style>
                 </div>
             )}
 
