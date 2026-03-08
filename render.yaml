@@ -9,4 +9,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: ALLOWED_ORIGINS
-        value: ""   # Set to your Vercel URL, e.g. https://agrovisus.vercel.app
+        value: "https://agrovisus-simulation-engine.vercel.app"
