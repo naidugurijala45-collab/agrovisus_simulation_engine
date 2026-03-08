@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { getCropTemplates, runSimulation } from '../api/client';
 import LocationPicker from '../components/LocationPicker';
+import ROIParameters from '../components/ROIParameters';
 import { exportElementToPDF } from '../utils/pdfExport';
 
 const DEFAULT_FORM = {
@@ -359,27 +360,13 @@ export default function Simulate() {
                 </div>
 
                 {/* ROI Inputs */}
-                <div style={{
-                    display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
-                    gap: 16, marginBottom: 20,
-                    padding: '14px 16px', borderRadius: 10,
-                    background: 'rgba(74,222,128,0.04)', border: '1px solid rgba(74,222,128,0.12)',
-                }}>
-                    <div style={{ gridColumn: '1/-1', fontSize: '0.75rem', fontWeight: 600, color: 'var(--green-400)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>
-                        ROI Parameters
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Field Size (acres)</label>
-                        <input className="form-input" type="number" name="field_acres" value={form.field_acres} onChange={handleChange} min={1} />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Treatment Cost ($/acre)</label>
-                        <input className="form-input" type="number" name="treatment_cost_per_acre" value={form.treatment_cost_per_acre} onChange={handleChange} min={0} />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Commodity Price ($/bu) <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>optional</span></label>
-                        <input className="form-input" type="number" name="commodity_price_usd_bu" value={form.commodity_price_usd_bu} onChange={handleChange} min={0} step={0.01} placeholder="e.g. 4.50 for corn" />
-                    </div>
+                <div style={{ marginBottom: 20 }}>
+                    <ROIParameters
+                        fieldAcres={form.field_acres}
+                        treatmentCostPerAcre={form.treatment_cost_per_acre}
+                        commodityPrice={form.commodity_price_usd_bu}
+                        onChange={(key, value) => setForm(f => ({ ...f, [key]: value }))}
+                    />
                 </div>
 
                 <div style={{ display: 'flex', gap: 12 }}>
