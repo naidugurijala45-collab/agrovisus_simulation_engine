@@ -39,10 +39,11 @@ const CHART_STYLE = {
 };
 
 const SEVERITY_COLOR = {
-    Low: { bg: 'var(--green-glow)', text: 'var(--green-400)', border: 'rgba(74,222,128,0.25)' },
-    Medium: { bg: 'var(--amber-glow)', text: 'var(--amber-400)', border: 'rgba(251,191,36,0.25)' },
-    High: { bg: 'var(--red-glow)', text: 'var(--red-400)', border: 'rgba(248,113,113,0.25)' },
-    Critical: { bg: 'var(--red-glow)', text: 'var(--red-400)', border: 'rgba(248,113,113,0.4)' },
+    Low:      { bg: 'rgba(74,222,128,0.15)',  text: '#4ade80',  border: 'rgba(74,222,128,0.35)' },
+    Medium:   { bg: 'rgba(251,191,36,0.15)',  text: '#fbbf24',  border: 'rgba(251,191,36,0.35)' },
+    Moderate: { bg: 'rgba(251,191,36,0.15)',  text: '#fbbf24',  border: 'rgba(251,191,36,0.35)' },
+    High:     { bg: 'rgba(239,68,68,0.18)',   text: '#f87171',  border: 'rgba(239,68,68,0.40)' },
+    Critical: { bg: 'rgba(239,68,68,0.28)',   text: '#fca5a5',  border: 'rgba(239,68,68,0.55)' },
 };
 
 const ROI_STRENGTH_COLOR = {
@@ -53,6 +54,11 @@ const ROI_STRENGTH_COLOR = {
 
 function fmt$(n) { return `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
 function fmtDec(n, d = 1) { return Number(n).toFixed(d); }
+function fmtDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 function RoiScenario({ label, pct = 0, highlight }) {
     const positive = pct >= 0;
@@ -79,8 +85,8 @@ function RoiScenario({ label, pct = 0, highlight }) {
 }
 
 function RuleCard({ group }) {
-    const sev = group.severity || 'Medium';
-    const sevStyle = SEVERITY_COLOR[sev] || SEVERITY_COLOR.Medium;
+    const sev = group.severity || 'Moderate';
+    const sevStyle = SEVERITY_COLOR[sev] || SEVERITY_COLOR.Moderate;
     const roi = group.roi;
     const strength = roi?.recommendation_strength;
     const strengthStyle = ROI_STRENGTH_COLOR[strength] || ROI_STRENGTH_COLOR['Monitor Only'];
@@ -89,6 +95,7 @@ function RuleCard({ group }) {
         <div style={{
             background: 'var(--bg-primary)',
             border: `1px solid ${sevStyle.border}`,
+            borderLeft: `4px solid ${sevStyle.text}`,
             borderRadius: 12,
             overflow: 'hidden',
         }}>
@@ -414,19 +421,35 @@ export default function Simulate() {
                     </div>
 
                     {/* KPI Cards */}
-                    <div className="card-grid card-grid-4 mb-4">
-                        {[
-                            { label: 'Final Biomass', value: `${result.total_biomass_kg_ha?.toFixed(0)} kg/ha`, sub: 'Total dry matter' },
-                            { label: 'Final Yield', value: `${result.final_yield_kg_ha?.toFixed(0)} kg/ha`, sub: 'Grain yield' },
-                            { label: 'Total Irrigation', value: `${result.total_irrigation_mm?.toFixed(0)} mm`, sub: 'Applied water' },
-                            { label: 'Max Disease', value: `${result.max_disease_severity?.toFixed(1)}%`, sub: 'Peak severity' },
-                        ].map((s) => (
-                            <div className="stat-tile" key={s.label}>
-                                <span className="stat-label">{s.label}</span>
-                                <span className="stat-value">{s.value}</span>
-                                <span className="stat-sub">{s.sub}</span>
+                    {(() => {
+                        const dis = result.max_disease_severity ?? 0;
+                        const diseaseColor = dis > 5 ? '#f87171' : dis >= 1 ? '#fbbf24' : '#4ade80';
+                        const kpis = [
+                            { label: 'Final Biomass',    value: `${result.total_biomass_kg_ha?.toFixed(0)} kg/ha`, sub: 'Total dry matter', border: '#14b8a6' },
+                            { label: 'Final Yield',      value: `${result.final_yield_kg_ha?.toFixed(0)} kg/ha`,   sub: 'Grain yield',      border: '#22c55e' },
+                            { label: 'Total Irrigation', value: `${result.total_irrigation_mm?.toFixed(0)} mm`,    sub: 'Applied water',    border: '#38bdf8' },
+                            { label: 'Max Disease',      value: `${dis.toFixed(1)}%`,                              sub: 'Peak severity',    border: diseaseColor },
+                        ];
+                        return (
+                            <div className="card-grid card-grid-4 mb-4">
+                                {kpis.map((s) => (
+                                    <div className="stat-tile" key={s.label} style={{ borderLeft: `3px solid ${s.border}` }}>
+                                        <span className="stat-label">{s.label}</span>
+                                        <span className="stat-value">{s.value}</span>
+                                        <span className="stat-sub">{s.sub}</span>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        );
+                    })()}
+
+                    {/* Section divider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, margin: '8px 0 20px' }}>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            Field Performance
+                        </span>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                     </div>
 
                     {/* Charts */}
@@ -443,7 +466,7 @@ export default function Simulate() {
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                                        <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={11} />
+                                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} />
                                         <Tooltip contentStyle={CHART_STYLE} />
                                         <Area type="monotone" dataKey="biomass_kg_ha" stroke="#22c55e" fill="url(#biomassGrad)" strokeWidth={2} dot={false} />
@@ -458,7 +481,7 @@ export default function Simulate() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={result.daily_data}>
                                         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                                        <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={11} />
+                                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} domain={[0, 1.2]} />
                                         <Tooltip contentStyle={CHART_STYLE} />
                                         <Line type="monotone" dataKey="soil_moisture" stroke="#38bdf8" strokeWidth={2} dot={false} name="Soil Moisture" />
@@ -473,7 +496,7 @@ export default function Simulate() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={result.daily_data}>
                                         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                                        <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={11} />
+                                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} domain={[0, 1]} />
                                         <Tooltip contentStyle={CHART_STYLE} />
                                         <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
@@ -491,7 +514,7 @@ export default function Simulate() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={result.daily_data}>
                                         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                                        <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={11} />
+                                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} />
                                         <Tooltip contentStyle={CHART_STYLE} />
                                         <Area type="monotone" dataKey="avg_temp_c" stroke="#fb923c" fill="rgba(251,146,60,0.15)" strokeWidth={2} dot={false} name="Avg Temp °C" />
@@ -502,12 +525,33 @@ export default function Simulate() {
                     </div>
 
                     {/* Triggered Rules with ROI */}
-                    {groupedRules.length > 0 && (
+                    {groupedRules.length > 0 && (() => {
+                        const highAlerts = groupedRules.filter(r => ['High', 'Critical'].includes(r.severity));
+                        const modAlerts  = groupedRules.filter(r => ['Moderate', 'Medium'].includes(r.severity));
+                        const lowAlerts  = groupedRules.filter(r => r.severity === 'Low');
+                        return (
                         <div className="card mt-6">
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-                                <h3 className="text-sm text-green">
-                                    ⚡ Advisory Alerts — {groupedRules.length} rule{groupedRules.length > 1 ? 's' : ''} triggered
-                                </h3>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                                <div>
+                                    <h3 className="text-sm text-green" style={{ marginBottom: 8 }}>⚡ Advisory Alerts</h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        {highAlerts.length > 0 && (
+                                            <span style={{ fontSize: '0.8rem', color: '#f87171', fontWeight: 600 }}>
+                                                ⚠ {highAlerts.length} HIGH alert{highAlerts.length > 1 ? 's' : ''} — requires immediate action
+                                            </span>
+                                        )}
+                                        {modAlerts.length > 0 && (
+                                            <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 500 }}>
+                                                ℹ {modAlerts.length} MODERATE alert{modAlerts.length > 1 ? 's' : ''} — monitor closely
+                                            </span>
+                                        )}
+                                        {lowAlerts.length > 0 && (
+                                            <span style={{ fontSize: '0.8rem', color: '#4ade80', fontWeight: 500 }}>
+                                                ✓ {lowAlerts.length} LOW alert{lowAlerts.length > 1 ? 's' : ''} — within acceptable range
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                                     {form.field_acres} acres · ${form.treatment_cost_per_acre}/acre treatment cost
                                 </span>
@@ -516,7 +560,8 @@ export default function Simulate() {
                                 {groupedRules.map((grp, i) => <RuleCard key={i} group={grp} />)}
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
 
                     {groupedRules.length === 0 && (
                         <div className="card mt-6" style={{ textAlign: 'center', padding: '32px 24px' }}>
