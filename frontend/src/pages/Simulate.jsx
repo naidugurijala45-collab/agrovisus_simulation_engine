@@ -19,7 +19,7 @@ import { exportElementToPDF } from '../utils/pdfExport';
 
 const DEFAULT_FORM = {
     crop_template: 'corn',
-    sim_days: 91,
+    sim_days: 120,
     start_date: new Date().toISOString().split('T')[0],
     latitude: 40.0,
     longitude: -88.0,
@@ -348,6 +348,7 @@ export default function Simulate() {
                     <div className="form-group">
                         <label className="form-label">Simulation Days</label>
                         <input className="form-input" type="number" name="sim_days" value={form.sim_days} onChange={handleChange} min={10} max={365} />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>Recommended: 120+ days for a full season</span>
                     </div>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                         <label className="form-label" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>

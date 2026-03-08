@@ -58,9 +58,14 @@ export default function LocationPicker({ lat, lng, onChange, resolved }) {
         const [fLng, fLat] = feature.geometry.coordinates;
         const ctx = feature.properties?.context ?? {};
 
-        // Extract state code — Mapbox returns e.g. "US-OH"; strip the country prefix
-        const rawRegion = ctx.region?.region_code_full ?? ctx.region?.region_code ?? '';
-        const state_code = rawRegion.replace(/^[A-Z]{2}-/, '');
+        // region_code gives "IL" directly; region_code_full gives "US-IL" (needs stripping).
+        // Prefer region_code to avoid picking up postal codes or other unexpected values.
+        let state_code = ctx.region?.region_code ?? '';
+        if (!state_code && ctx.region?.region_code_full) {
+            state_code = ctx.region.region_code_full.replace(/^[A-Z]{2}-/, '');
+        }
+        // Guard: discard anything that isn't exactly 2 alpha characters
+        if (!/^[A-Z]{2}$/.test(state_code)) state_code = '';
 
         const formatted_address =
             feature.properties?.full_address ??
