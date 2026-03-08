@@ -53,6 +53,7 @@ class SimulationRequest(BaseModel):
     field_acres: float = 100.0
     treatment_cost_per_acre: float = 25.0
     commodity_price_usd_bu: Optional[float] = None
+    state_code: Optional[str] = None
 
 
 class DailyDataPoint(BaseModel):
@@ -141,7 +142,11 @@ def run_simulation(req: SimulationRequest):
     logger.info(f"Running simulation: crop={req.crop_template}, days={req.sim_days}")
     try:
         config = _build_config(req)
-        service = SimulationService(config_data=config, project_root=str(ENGINE_ROOT))
+        service = SimulationService(
+            config_data=config,
+            project_root=str(ENGINE_ROOT),
+            state_code=req.state_code or None,
+        )
 
         if req.start_date:
             try:
@@ -190,6 +195,7 @@ def run_simulation(req: SimulationRequest):
                         field_acres=req.field_acres,
                         treatment_cost_per_acre=req.treatment_cost_per_acre,
                         current_commodity_price=req.commodity_price_usd_bu,
+                        baseline_yield_bu_acre=result.get("regional_yield_benchmark_bu_ac"),
                     )
                 enriched_rules_list.append(rule)
             enriched_day["rules"] = enriched_rules_list

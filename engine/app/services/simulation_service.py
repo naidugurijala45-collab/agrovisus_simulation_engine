@@ -19,9 +19,12 @@ from app.models.disease_model import DiseaseModel
 from app.utils.validators import validate_config_value, validate_positive, validate_range
 from app.utils.exceptions import ConfigValidationError, ModelInitError, SimulationError
 from app.utils.crop_template_loader import CropTemplateLoader
+from app.services.regional_profile_loader import (
+    load_profile, get_disease_multiplier, get_soil_defaults, get_yield_benchmark,
+)
 
 class SimulationService:
-    def __init__(self, config_data: Dict[str, Any], project_root: str):
+    def __init__(self, config_data: Dict[str, Any], project_root: str, state_code: Optional[str] = None):
         self.config = config_data
         self.project_root = project_root
         self.logger = logging.getLogger(__name__)
@@ -49,8 +52,10 @@ class SimulationService:
                 self.management_events[day].append(event)
         self.logger.info(f"Loaded {len(self.management_schedule_list)} management events from config.")
 
+        self.state_code = (state_code or "").strip().upper() or None
+
         # Initialize Models
-        self._initialize_models()
+        self._initialize_models(state_code=self.state_code)
     
     def _validate_config(self):
         """Validate critical configuration values."""
@@ -173,8 +178,22 @@ class SimulationService:
             self.crop_template_loader = None
             return dict(self.crop_config_conf), None
 
-    def _initialize_models(self):
+    def _initialize_models(self, state_code: Optional[str] = None):
         try:
+            # ── Regional profile ────────────────────────────────────────────
+            if state_code:
+                self.regional_profile = load_profile(state_code)
+                self.regional_yield_benchmark_bu_ac = get_yield_benchmark(state_code)
+                self.logger.info(
+                    "Regional profile loaded: %s (%s)",
+                    self.regional_profile.get("region_key", "unknown"),
+                    state_code,
+                )
+            else:
+                self.regional_profile = None
+                self.regional_yield_benchmark_bu_ac = None
+                self.logger.info("No state_code provided, using defaults.")
+
             # Weather Service (new unified service)
             self.weather_service = WeatherService(self.config, self.project_root)
 
@@ -206,12 +225,26 @@ class SimulationService:
                 reproductive_stages=resolved_crop_config.get("reproductive_stages"),
             )
 
-            # Soil Model — use template soil defaults as fallback
+            # Soil Model — priority: explicit user config > template defaults > regional defaults
             if full_template:
                 soil_defaults = full_template.get("soil", {})
             else:
                 soil_defaults = {}
-            
+
+            # Regional soil defaults fill in only when user hasn't provided explicit values
+            user_provided_fc = self.soil_params_conf.get("field_capacity_mm") is not None
+            user_provided_wp = self.soil_params_conf.get("wilting_point_mm") is not None
+            if state_code and not user_provided_fc:
+                regional_soil = get_soil_defaults(state_code)
+                self.logger.info(
+                    "Applying regional soil defaults for %s: FC=%s mm, WP=%s mm",
+                    state_code,
+                    regional_soil.get("field_capacity_mm"),
+                    regional_soil.get("wilting_point_mm"),
+                )
+            else:
+                regional_soil = {}
+
             root_zone_depth_mm = self._safe_float(
                 self.sim_inputs_conf.get("assumed_root_zone_depth_mm")
                 or soil_defaults.get("assumed_root_zone_depth_mm"),
@@ -221,10 +254,12 @@ class SimulationService:
             fc_mm = self._safe_float(
                 self.soil_params_conf.get("field_capacity_mm")
                 or soil_defaults.get("field_capacity_mm")
+                or regional_soil.get("field_capacity_mm")
             )
             wp_mm = self._safe_float(
                 self.soil_params_conf.get("wilting_point_mm")
                 or soil_defaults.get("wilting_point_mm")
+                or regional_soil.get("wilting_point_mm")
             )
             sat_vol = self._safe_float(
                 self.soil_params_conf.get("saturation_volumetric")
@@ -273,6 +308,18 @@ class SimulationService:
                 self.logger.info("Using single disease model from config.")
             # Keep singular alias for ReportingService compatibility
             self.disease_model = self.disease_models[0]
+
+            # Apply regional disease risk multipliers to max_severity_rate
+            if state_code:
+                for dm in self.disease_models:
+                    disease_id = dm.config.get("id") or dm.config.get("name", "")
+                    multiplier = get_disease_multiplier(state_code, disease_id)
+                    if multiplier != 1.0:
+                        dm.max_severity_rate = dm.max_severity_rate * multiplier
+                        self.logger.info(
+                            "Disease '%s': applied regional multiplier %.2f → max_severity_rate=%.4f",
+                            disease_id, multiplier, dm.max_severity_rate,
+                        )
 
             # Rule Engine
             rule_path = self._resolve_path(self.config.get("rule_path", "rules.json"))
@@ -497,7 +544,8 @@ class SimulationService:
             return {
                 "total_biomass_kg_ha": self.crop_model.total_biomass_kg_ha,
                 "final_yield_kg_ha": final_yield,
-                "triggered_rules": all_triggered_rules_over_time
+                "triggered_rules": all_triggered_rules_over_time,
+                "regional_yield_benchmark_bu_ac": self.regional_yield_benchmark_bu_ac,
             }
 
         finally:

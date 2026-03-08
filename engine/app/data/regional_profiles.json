@@ -1,0 +1,89 @@
+{
+  "regions": {
+    "corn_belt": {
+      "display_name": "Corn Belt",
+      "states": ["OH", "IN", "IL", "IA", "MO"],
+      "yield_benchmark_bu_ac": 185,
+      "disease_risk_multipliers": {
+        "nclb": 1.2,
+        "gls": 1.0,
+        "common_rust": 0.9
+      },
+      "soil_defaults": {
+        "field_capacity_mm": 180,
+        "wilting_point_mm": 90,
+        "ph_range": [6.0, 7.0],
+        "organic_matter_pct": 3.5
+      },
+      "gdd_adjustment": 0
+    },
+    "great_plains": {
+      "display_name": "Great Plains",
+      "states": ["KS", "NE", "SD", "ND", "MN"],
+      "yield_benchmark_bu_ac": 155,
+      "disease_risk_multipliers": {
+        "nclb": 0.8,
+        "gls": 0.7,
+        "common_rust": 1.1
+      },
+      "soil_defaults": {
+        "field_capacity_mm": 150,
+        "wilting_point_mm": 75,
+        "ph_range": [6.5, 7.5],
+        "organic_matter_pct": 2.8
+      },
+      "gdd_adjustment": -50
+    },
+    "southeast": {
+      "display_name": "Southeast",
+      "states": ["GA", "AL", "MS", "AR", "TN", "NC", "SC", "VA"],
+      "yield_benchmark_bu_ac": 160,
+      "disease_risk_multipliers": {
+        "nclb": 1.0,
+        "gls": 1.5,
+        "common_rust": 1.3
+      },
+      "soil_defaults": {
+        "field_capacity_mm": 140,
+        "wilting_point_mm": 70,
+        "ph_range": [5.5, 6.5],
+        "organic_matter_pct": 1.8
+      },
+      "gdd_adjustment": 100
+    },
+    "delta": {
+      "display_name": "Delta",
+      "states": ["LA", "TX", "OK"],
+      "yield_benchmark_bu_ac": 150,
+      "disease_risk_multipliers": {
+        "nclb": 0.9,
+        "gls": 1.4,
+        "common_rust": 1.2
+      },
+      "soil_defaults": {
+        "field_capacity_mm": 160,
+        "wilting_point_mm": 80,
+        "ph_range": [5.8, 7.0],
+        "organic_matter_pct": 2.0
+      },
+      "gdd_adjustment": 150
+    },
+    "default": {
+      "display_name": "Default (Corn Belt equivalent)",
+      "states": [],
+      "yield_benchmark_bu_ac": 185,
+      "disease_risk_multipliers": {
+        "nclb": 1.2,
+        "gls": 1.0,
+        "common_rust": 0.9
+      },
+      "soil_defaults": {
+        "field_capacity_mm": 180,
+        "wilting_point_mm": 90,
+        "ph_range": [6.0, 7.0],
+        "organic_matter_pct": 3.5
+      },
+      "gdd_adjustment": 0
+    }
+  }
+}

@@ -273,6 +273,7 @@ export default function Simulate() {
             const payload = {
                 ...form,
                 management_schedule: [],
+                state_code: form.state_code || null,
                 field_acres: parseFloat(form.field_acres) || 100,
                 treatment_cost_per_acre: parseFloat(form.treatment_cost_per_acre) || 25,
                 commodity_price_usd_bu: form.commodity_price_usd_bu !== '' ? parseFloat(form.commodity_price_usd_bu) : null,
