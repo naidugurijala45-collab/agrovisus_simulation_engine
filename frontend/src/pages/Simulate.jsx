@@ -27,6 +27,8 @@ const DEFAULT_FORM = {
     field_acres: 100,
     treatment_cost_per_acre: 25,
     commodity_price_usd_bu: '',
+    state_code: '',
+    formatted_address: '',
 };
 
 const CHART_STYLE = {
@@ -258,8 +260,8 @@ export default function Simulate() {
         setForm((f) => ({ ...f, [name]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value }));
     };
 
-    const handleLocationChange = (lat, lng) => {
-        setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+    const handleLocationChange = (lat, lng, meta = {}) => {
+        setForm((f) => ({ ...f, latitude: lat, longitude: lng, ...meta }));
     };
 
     const handleRun = async () => {
@@ -355,7 +357,12 @@ export default function Simulate() {
                             <span>Field Location</span>
                             <span className="text-muted">Lat: {form.latitude.toFixed(4)}, Lng: {form.longitude.toFixed(4)}</span>
                         </label>
-                        <LocationPicker lat={form.latitude} lng={form.longitude} onChange={handleLocationChange} />
+                        <LocationPicker
+                                            lat={form.latitude}
+                                            lng={form.longitude}
+                                            onChange={handleLocationChange}
+                                            resolved={{ formatted_address: form.formatted_address, state_code: form.state_code }}
+                                        />
                     </div>
                 </div>
 
