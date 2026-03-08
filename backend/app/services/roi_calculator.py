@@ -33,6 +33,7 @@ KG_HA_TO_BU_ACRE = 0.01487
 SEVERITY_YIELD_LOSS: Dict[str, float] = {
     "Low": 0.03,
     "Medium": 0.08,
+    "Moderate": 0.08,
     "High": 0.15,
     "Critical": 0.25,
 }
@@ -140,7 +141,12 @@ def enrich_rule_with_roi(
     otherwise defaults to medium (8 %).
     """
     severity = rule.get("severity", "Medium")
-    yield_loss_pct = SEVERITY_YIELD_LOSS.get(severity, SEVERITY_YIELD_LOSS["Medium"]) * 100.0
+    # Use per-rule yield_impact_percent if present (set in rules.json per rule);
+    # fall back to the severity-level lookup table.
+    yield_loss_pct = (
+        rule.get("yield_impact_percent")
+        or SEVERITY_YIELD_LOSS.get(severity, SEVERITY_YIELD_LOSS["Medium"]) * 100.0
+    )
 
     roi = calculate_roi(
         crop_type=crop_type,

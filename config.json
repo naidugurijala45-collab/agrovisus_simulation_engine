@@ -74,24 +74,5 @@
       "R6": 0.6
     }
   },
-  "management_schedule": [
-    { "day": 12, "type": "irrigation", "amount_mm": 25.0 },
-    { "day": 15, "type": "fertilizer", "fertilizer_type": "urea", "amount_kg_ha": 50.0 },
-    { "day": 17, "type": "irrigation", "amount_mm": 25.0 },
-    { "day": 22, "type": "irrigation", "amount_mm": 25.0 },
-    { "day": 27, "type": "irrigation", "amount_mm": 25.0 },
-    { "day": 32, "type": "irrigation", "amount_mm": 25.0 },
-    { "day": 37, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 42, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 47, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 52, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 55, "type": "fertilizer", "fertilizer_type": "urea", "amount_kg_ha": 75.0 },
-    { "day": 57, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 62, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 67, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 72, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 77, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 82, "type": "irrigation", "amount_mm": 30.0 },
-    { "day": 87, "type": "irrigation", "amount_mm": 30.0 }
-  ]
+  "management_schedule": []
 }

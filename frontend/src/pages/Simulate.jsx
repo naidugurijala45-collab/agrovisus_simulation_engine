@@ -130,6 +130,11 @@ function RuleCard({ group }) {
                         Active: {group.startDate === group.endDate
                             ? group.startDate
                             : `${group.startDate} → ${group.endDate}`}
+                        {group.daysActive > 1 && (
+                            <span style={{ marginLeft: 8, color: 'var(--amber-400)', fontWeight: 600 }}>
+                                ({group.daysActive}d)
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -299,29 +304,29 @@ export default function Simulate() {
         const stream = [];
         for (const day of result.triggered_rules) {
             for (const r of day.rules || []) {
-                stream.push({ date: day.date, rule: r });
+                stream.push({
+                    date: day.date,
+                    lastTriggered: day.last_triggered || day.date,
+                    daysActive: day.days_active || 1,
+                    rule: r,
+                });
             }
         }
-        let current = null;
+        // Backend already deduplicates by rule_id; each day-entry is unique.
+        // last_triggered and days_active come from the backend dedup pass.
         for (const item of stream) {
-            const id = item.rule.rule_id;
-            if (!current || current.id !== id) {
-                if (current) groupedRules.push(current);
-                current = {
-                    id,
-                    name: item.rule.name || id,
-                    severity: item.rule.severity,
-                    alert_type: item.rule.alert_type,
-                    recommendation: item.rule.recommendation,
-                    roi: item.rule.roi,
-                    startDate: item.date,
-                    endDate: item.date,
-                };
-            } else {
-                current.endDate = item.date;
-            }
+            groupedRules.push({
+                id: item.rule.rule_id,
+                name: item.rule.name || item.rule.rule_id,
+                severity: item.rule.severity,
+                alert_type: item.rule.alert_type,
+                recommendation: item.rule.recommendation,
+                roi: item.rule.roi,
+                startDate: item.date,
+                endDate: item.lastTriggered || item.date,
+                daysActive: item.daysActive || 1,
+            });
         }
-        if (current) groupedRules.push(current);
     }
 
     return (

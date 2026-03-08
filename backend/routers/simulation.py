@@ -90,18 +90,18 @@ def _build_config(req: SimulationRequest) -> Dict[str, Any]:
     cfg["simulation_settings"]["elevation_m"] = req.elevation_m
     cfg["crop_model_config"]["crop_template"] = req.crop_template
 
-    # Build management schedule
-    if req.management_schedule:
-        events = []
-        for e in req.management_schedule:
-            ev: Dict[str, Any] = {"day": e.day, "type": e.type}
-            if e.type == "irrigation":
-                ev["amount_mm"] = e.amount_mm or 0.0
-            elif e.type == "fertilizer":
-                ev["amount_kg_ha"] = e.amount_kg_ha or 0.0
-                ev["fertilizer_type"] = e.fertilizer_type or "urea"
-            events.append(ev)
-        cfg["management_schedule"] = events
+    # Always override management_schedule from the request — even an empty list
+    # must clear the config.json defaults so users don't inherit unintended events.
+    events = []
+    for e in req.management_schedule:
+        ev: Dict[str, Any] = {"day": e.day, "type": e.type}
+        if e.type == "irrigation":
+            ev["amount_mm"] = e.amount_mm or 0.0
+        elif e.type == "fertilizer":
+            ev["amount_kg_ha"] = e.amount_kg_ha or 0.0
+            ev["fertilizer_type"] = e.fertilizer_type or "urea"
+        events.append(ev)
+    cfg["management_schedule"] = events
 
     return cfg
 
@@ -132,6 +132,36 @@ def _parse_csv(csv_path: str) -> List[DailyDataPoint]:
                 avg_temp_c=g("daily_avg_temp_c"),
             ))
     return points
+
+
+def _deduplicate_triggered_rules(enriched_rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Collapse multiple day-entries for the same rule_id into one entry.
+
+    Returns one dict per unique rule_id:
+        date            – first day the rule fired
+        last_triggered  – last day the rule fired
+        days_active     – total count of days it fired
+        rules           – list containing the single rule dict (last occurrence)
+    """
+    seen: Dict[str, Dict[str, Any]] = {}
+    for day_entry in enriched_rules:
+        date = day_entry["date"]
+        for rule in day_entry.get("rules", []):
+            rid = rule.get("rule_id", "")
+            if rid not in seen:
+                seen[rid] = {
+                    "date": date,
+                    "last_triggered": date,
+                    "days_active": 1,
+                    "rules": [rule],
+                }
+            else:
+                seen[rid]["last_triggered"] = date
+                seen[rid]["days_active"] += 1
+                seen[rid]["rules"] = [rule]  # keep most-recent rule data
+
+    return sorted(seen.values(), key=lambda e: e["date"])
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────
@@ -204,6 +234,8 @@ def run_simulation(req: SimulationRequest):
             enriched_day["rules"] = enriched_rules_list
             enriched_rules.append(enriched_day)
 
+        deduped_rules = _deduplicate_triggered_rules(enriched_rules)
+
         return SimulationResult(
             total_biomass_kg_ha=result.get("total_biomass_kg_ha", 0.0),
             final_yield_kg_ha=actual_yield,
@@ -211,7 +243,7 @@ def run_simulation(req: SimulationRequest):
             total_precipitation_mm=total_precip,
             max_disease_severity=max_disease,
             daily_data=daily_data,
-            triggered_rules=enriched_rules,
+            triggered_rules=deduped_rules,
         )
 
     except (ConfigValidationError, ModelInitError) as e:

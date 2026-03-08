@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backend.app.services.roi_calculator import calculate_roi, enrich_rule_with_roi
+from backend.app.services.roi_calculator import calculate_roi, enrich_rule_with_roi, SEVERITY_YIELD_LOSS
 
 FLAT_KEYS = {
     "estimated_yield_loss_bu_acre",
@@ -89,6 +89,39 @@ def test_enrich_rule_has_flat_roi():
     enriched = enrich_rule_with_roi(rule, crop_type="corn", field_acres=100.0, treatment_cost_per_acre=25.0)
     assert "roi" in enriched
     assert set(enriched["roi"].keys()) == FLAT_KEYS
+
+
+def test_moderate_severity_in_lookup():
+    """'Moderate' must not fall back to 'Medium' — both map to 8% but Moderate is explicit."""
+    result = calculate_roi("corn", 8.0, 25.0, 100.0)   # uses Medium fallback
+    moderate = calculate_roi("corn", SEVERITY_YIELD_LOSS["Moderate"] * 100, 25.0, 100.0)
+    assert moderate["estimated_yield_loss_bu_acre"] == result["estimated_yield_loss_bu_acre"]
+
+
+def test_per_rule_yield_impact_overrides_severity():
+    """A rule with yield_impact_percent set should use that, not its severity level."""
+    rule_with_impact = {
+        "rule_id": "LOW_N", "severity": "High",  # High → 15% by severity
+        "yield_impact_percent": 12.0,              # but rule says 12%
+        "alert_type": "nutrient",
+    }
+    enriched = enrich_rule_with_roi(rule_with_impact, crop_type="corn", field_acres=100.0, treatment_cost_per_acre=25.0)
+    # 12% of 180 bu/acre = 21.6
+    assert abs(enriched["roi"]["estimated_yield_loss_bu_acre"] - 21.6) < 0.1
+
+
+def test_different_rules_different_roi():
+    """Rules with different yield_impact_percent must produce different ROI numbers."""
+    drought_rule = {"rule_id": "DROUGHT", "severity": "High", "yield_impact_percent": 18.0, "alert_type": "stress"}
+    nitrogen_rule = {"rule_id": "LOW_N",  "severity": "Moderate", "yield_impact_percent": 12.0, "alert_type": "nutrient"}
+    foliar_rule   = {"rule_id": "FOLIAR", "severity": "Low", "yield_impact_percent": 3.0,  "alert_type": "disease"}
+
+    kwargs = dict(crop_type="corn", field_acres=100.0, treatment_cost_per_acre=25.0)
+    d = enrich_rule_with_roi(drought_rule, **kwargs)["roi"]
+    n = enrich_rule_with_roi(nitrogen_rule, **kwargs)["roi"]
+    f = enrich_rule_with_roi(foliar_rule, **kwargs)["roi"]
+
+    assert d["estimated_yield_loss_bu_acre"] > n["estimated_yield_loss_bu_acre"] > f["estimated_yield_loss_bu_acre"]
 
 
 def test_soybean_defaults():

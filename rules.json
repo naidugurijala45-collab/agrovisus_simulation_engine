@@ -13,6 +13,7 @@
       "result": {
         "severity": "High",
         "alert_type": "Drought Stress",
+        "yield_impact_percent": 18.0,
         "recommendation": "Soil moisture is critically low. Immediate irrigation is recommended to prevent yield loss."
       }
     },
@@ -34,6 +35,7 @@
       "result": {
         "severity": "Moderate",
         "alert_type": "Nutrient Stress",
+        "yield_impact_percent": 12.0,
         "recommendation": "Available Nitrogen is low for the current growth stage. Consider top-dressing with N fertilizer."
       }
     },
@@ -50,6 +52,7 @@
       "result": {
         "severity": "Moderate",
         "alert_type": "Foliar Disease Risk",
+        "yield_impact_percent": 10.0,
         "recommendation": "Conditions are moderately favorable for foliar disease. Increase scouting frequency."
       }
     },
@@ -66,6 +69,7 @@
       "result": {
         "severity": "Low",
         "alert_type": "Foliar Disease Risk",
+        "yield_impact_percent": 3.0,
         "recommendation": "Leaf wetness duration is low, reducing general risk for many foliar diseases."
       }
     }
