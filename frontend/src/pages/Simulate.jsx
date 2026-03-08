@@ -56,8 +56,15 @@ function fmt$(n) { return `$${Number(n).toLocaleString('en-US', { minimumFractio
 function fmtDec(n, d = 1) { return Number(n).toFixed(d); }
 function fmtDate(dateStr) {
     if (!dateStr) return '';
+    // Append T00:00:00 to force local-time parsing — bare YYYY-MM-DD is parsed
+    // as UTC midnight which shifts the displayed date in non-UTC timezones.
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function fmtDateFull(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function RoiScenario({ label, pct = 0, highlight }) {
@@ -135,8 +142,8 @@ function RuleCard({ group }) {
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         Active: {group.startDate === group.endDate
-                            ? group.startDate
-                            : `${group.startDate} → ${group.endDate}`}
+                            ? fmtDateFull(group.startDate)
+                            : `${fmtDateFull(group.startDate)} → ${fmtDateFull(group.endDate)}`}
                         {group.daysActive > 1 && (
                             <span style={{ marginLeft: 8, color: 'var(--amber-400)', fontWeight: 600 }}>
                                 ({group.daysActive}d)

@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from backend.app.services.roi_calculator import calculate_roi, enrich_rule_with_roi, SEVERITY_YIELD_LOSS
+from backend.routers.simulation import _deduplicate_triggered_rules
 
 FLAT_KEYS = {
     "estimated_yield_loss_bu_acre",
@@ -134,3 +135,50 @@ def test_unknown_crop_fallback():
     # Should not raise; falls back to defaults
     assert result["commodity_price_used"] == 4.50
     assert result["estimated_yield_loss_bu_acre"] > 0
+
+
+# ── Deduplication tests ────────────────────────────────────────────────────
+
+def test_dedup_single_day_rule_survives():
+    """A rule that fires only once must appear exactly once in the output."""
+    raw = [
+        {
+            "date": "2025-06-01",
+            "rules": [{"rule_id": "Common_Rust_Risk", "name": "Common Rust Risk", "severity": "Moderate"}],
+        }
+    ]
+    result = _deduplicate_triggered_rules(raw)
+    assert len(result) == 1
+    assert result[0]["rules"][0]["rule_id"] == "Common_Rust_Risk"
+    assert result[0]["days_active"] == 1
+
+
+def test_dedup_multi_day_rule_collapsed():
+    """Same rule firing on 3 consecutive days should produce one entry with days_active=3."""
+    raw = [
+        {"date": "2025-06-01", "rules": [{"rule_id": "NCLB_Risk", "name": "NCLB", "severity": "High"}]},
+        {"date": "2025-06-02", "rules": [{"rule_id": "NCLB_Risk", "name": "NCLB", "severity": "High"}]},
+        {"date": "2025-06-03", "rules": [{"rule_id": "NCLB_Risk", "name": "NCLB", "severity": "High"}]},
+    ]
+    result = _deduplicate_triggered_rules(raw)
+    assert len(result) == 1
+    assert result[0]["days_active"] == 3
+    assert result[0]["date"] == "2025-06-01"
+    assert result[0]["last_triggered"] == "2025-06-03"
+
+
+def test_dedup_distinct_rules_both_survive():
+    """Two different rules appearing on the same day must both appear in output."""
+    raw = [
+        {
+            "date": "2025-06-01",
+            "rules": [
+                {"rule_id": "NCLB_Risk", "name": "NCLB", "severity": "High"},
+                {"rule_id": "Common_Rust_Risk", "name": "Common Rust", "severity": "Moderate"},
+            ],
+        }
+    ]
+    result = _deduplicate_triggered_rules(raw)
+    ids = {r["rules"][0]["rule_id"] for r in result}
+    assert "NCLB_Risk" in ids
+    assert "Common_Rust_Risk" in ids

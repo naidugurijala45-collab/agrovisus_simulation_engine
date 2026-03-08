@@ -148,7 +148,7 @@ def _deduplicate_triggered_rules(enriched_rules: List[Dict[str, Any]]) -> List[D
     for day_entry in enriched_rules:
         date = day_entry["date"]
         for rule in day_entry.get("rules", []):
-            rid = rule.get("rule_id", "")
+            rid = rule.get("rule_id") or rule.get("name", "")
             if rid not in seen:
                 seen[rid] = {
                     "date": date,
