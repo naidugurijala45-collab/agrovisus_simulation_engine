@@ -54,8 +54,7 @@ const ROI_STRENGTH_COLOR = {
 function fmt$(n) { return `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
 function fmtDec(n, d = 1) { return Number(n).toFixed(d); }
 
-function RoiScenario({ label, data, highlight }) {
-    const pct = data?.roi_percent ?? 0;
+function RoiScenario({ label, pct = 0, highlight }) {
     const positive = pct >= 0;
     return (
         <div style={{
@@ -74,9 +73,6 @@ function RoiScenario({ label, data, highlight }) {
                 color: positive ? 'var(--green-400)' : 'var(--red-400)',
             }}>
                 {positive ? '+' : ''}{fmtDec(pct, 0)}%
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                {fmt$(data?.net_benefit_usd ?? 0)} net
             </div>
         </div>
     );
@@ -190,9 +186,9 @@ function RuleCard({ group }) {
                             Treatment ROI (by fungicide/treatment efficacy)
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <RoiScenario label="Low (50%)" data={roi.treatment_roi?.low} />
-                            <RoiScenario label="Medium (70%)" data={roi.treatment_roi?.medium} highlight />
-                            <RoiScenario label="High (90%)" data={roi.treatment_roi?.high} />
+                            <RoiScenario label="Low (50%)" pct={roi.roi_low} />
+                            <RoiScenario label="Medium (70%)" pct={roi.roi_mid} highlight />
+                            <RoiScenario label="High (90%)" pct={roi.roi_high} />
                         </div>
                     </div>
 

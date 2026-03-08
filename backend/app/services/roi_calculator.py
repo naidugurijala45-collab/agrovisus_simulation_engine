@@ -65,9 +65,12 @@ def calculate_roi(
             revenue_at_risk_per_acre        – USD revenue at risk per acre
             revenue_at_risk_total           – USD revenue at risk for field
             treatment_cost_total            – total treatment cost for field
-            treatment_roi                   – dict with low/medium/high ROI scenarios
+            roi_low                         – ROI % at 50% treatment efficacy
+            roi_mid                         – ROI % at 70% treatment efficacy
+            roi_high                        – ROI % at 90% treatment efficacy
             breakeven_yield_loss_percent    – minimum yield loss % where treatment pays off
             recommendation_strength         – "Strong Buy" / "Marginal" / "Monitor Only"
+            commodity_price_used            – commodity price applied (USD/bu)
     """
     crop_key = crop_type.lower()
 
@@ -84,20 +87,14 @@ def calculate_roi(
 
     # Treatment efficacy scenarios (fraction of loss that treatment recovers)
     efficacy = {"low": 0.50, "medium": 0.70, "high": 0.90}
-    roi_scenarios: Dict[str, Dict[str, float]] = {}
+    roi_by_scenario: Dict[str, float] = {}
     for scenario, eff in efficacy.items():
         revenue_saved = revenue_at_risk_total * eff
         net_benefit = revenue_saved - treatment_cost_total
         roi_pct = (net_benefit / treatment_cost_total * 100.0) if treatment_cost_total > 0 else 0.0
-        roi_scenarios[scenario] = {
-            "revenue_saved_usd": round(revenue_saved, 2),
-            "net_benefit_usd": round(net_benefit, 2),
-            "roi_percent": round(roi_pct, 1),
-        }
+        roi_by_scenario[scenario] = round(roi_pct, 1)
 
     # Breakeven: minimum yield loss % where treatment cost equals revenue saved (medium efficacy)
-    # revenue_saved = baseline * breakeven_loss * price * efficacy_medium * acres
-    # revenue_saved = treatment_cost_total  →  solve for breakeven_loss
     eff_medium = efficacy["medium"]
     if (baseline * price * eff_medium * field_acres) > 0:
         breakeven_loss_fraction = treatment_cost_total / (baseline * price * eff_medium * field_acres)
@@ -106,7 +103,7 @@ def calculate_roi(
         breakeven_yield_loss_pct = 0.0
 
     # Recommendation strength
-    medium_roi = roi_scenarios["medium"]["roi_percent"]
+    medium_roi = roi_by_scenario["medium"]
     if medium_roi >= 50.0:
         recommendation_strength = "Strong Buy"
     elif medium_roi >= 0.0:
@@ -119,9 +116,12 @@ def calculate_roi(
         "revenue_at_risk_per_acre": round(revenue_at_risk_per_acre, 2),
         "revenue_at_risk_total": round(revenue_at_risk_total, 2),
         "treatment_cost_total": round(treatment_cost_total, 2),
-        "treatment_roi": roi_scenarios,
+        "roi_low": roi_by_scenario["low"],
+        "roi_mid": roi_by_scenario["medium"],
+        "roi_high": roi_by_scenario["high"],
         "breakeven_yield_loss_percent": breakeven_yield_loss_pct,
         "recommendation_strength": recommendation_strength,
+        "commodity_price_used": round(price, 2),
     }
 
 
@@ -131,6 +131,7 @@ def enrich_rule_with_roi(
     field_acres: float,
     treatment_cost_per_acre: float = 25.0,
     current_commodity_price: float | None = None,
+    baseline_yield_bu_acre: float | None = None,
 ) -> Dict[str, Any]:
     """
     Add an `roi` block to a triggered rule dict.
@@ -147,5 +148,6 @@ def enrich_rule_with_roi(
         treatment_cost_per_acre=treatment_cost_per_acre,
         field_acres=field_acres,
         current_commodity_price=current_commodity_price,
+        baseline_yield_bu_acre=baseline_yield_bu_acre,
     )
     return {**rule, "roi": roi}

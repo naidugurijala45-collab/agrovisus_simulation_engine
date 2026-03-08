@@ -183,7 +183,7 @@ class TestReportGeneration:
         if not os.path.exists(csv_path):
             pytest.skip("No simulation output found")
 
-        rg = ReportGenerator(templates_dir="app/templates", plots_subdir="plots")
+        rg = ReportGenerator(templates_dir=os.path.join(ENGINE_ROOT, "app", "templates"), plots_subdir="plots")
         report_path = rg.generate_scenario_report(
             simulation_csv_filepath=csv_path,
             config_filepath=os.path.join(ENGINE_ROOT, "config.json"),

@@ -189,14 +189,17 @@ def run_simulation(req: SimulationRequest):
             for rule in day_entry.get("rules", []):
                 alert_type = rule.get("alert_type", "").lower()
                 if any(kw in alert_type for kw in ROI_ALERT_TYPES):
-                    rule = enrich_rule_with_roi(
-                        rule=rule,
-                        crop_type=req.crop_template,
-                        field_acres=req.field_acres,
-                        treatment_cost_per_acre=req.treatment_cost_per_acre,
-                        current_commodity_price=req.commodity_price_usd_bu,
-                        baseline_yield_bu_acre=result.get("regional_yield_benchmark_bu_ac"),
-                    )
+                    try:
+                        rule = enrich_rule_with_roi(
+                            rule=rule,
+                            crop_type=req.crop_template,
+                            field_acres=req.field_acres,
+                            treatment_cost_per_acre=req.treatment_cost_per_acre,
+                            current_commodity_price=req.commodity_price_usd_bu,
+                            baseline_yield_bu_acre=result.get("regional_yield_benchmark_bu_ac"),
+                        )
+                    except Exception as roi_err:
+                        logger.warning(f"ROI enrichment failed for rule {rule.get('rule_id')}: {roi_err}")
                 enriched_rules_list.append(rule)
             enriched_day["rules"] = enriched_rules_list
             enriched_rules.append(enriched_day)
