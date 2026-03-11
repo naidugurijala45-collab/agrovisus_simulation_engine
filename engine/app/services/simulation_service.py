@@ -374,7 +374,16 @@ class SimulationService:
         all_triggered_rules_over_time = []
         all_rows = []
         csv_file = None
-        
+
+        # Prefetch entire date range from Open-Meteo in one API call so the
+        # per-day loop hits the in-memory cache instead of making 150+ requests.
+        if sim_dates_to_process:
+            self.weather_service.prefetch_date_range(
+                latitude, longitude,
+                sim_dates_to_process[0],
+                sim_dates_to_process[-1],
+            )
+
         try:
             csv_file = open(output_csv_path, 'w', newline='', encoding='utf-8')
             csv_writer = csv.DictWriter(csv_file, fieldnames=csv_headers)

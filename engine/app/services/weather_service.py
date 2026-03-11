@@ -94,6 +94,9 @@ class WeatherService:
         self._api_calls_today = 0
         self._api_call_timestamps: List[float] = []
 
+        # In-memory cache for prefetched Open-Meteo range data (date -> dict)
+        self._openmeteo_daily_cache: Dict[date, Dict] = {}
+
         # Setup cache directory
         if self.cache_enabled:
             os.makedirs(CACHE_DIR, exist_ok=True)
@@ -218,6 +221,71 @@ class WeatherService:
         if df is not None and not df.empty:
             return sorted(list(set(df.index.date)))
         return []
+
+    def prefetch_date_range(self, lat: float, lon: float, start_date: date, end_date: date):
+        """
+        Fetch the entire simulation date range from Open-Meteo in ONE API call.
+
+        Results are stored in self._openmeteo_daily_cache so per-day calls in
+        get_daily_weather() skip the network entirely and return instantly.
+        Falls back silently — per-day fetches still work if this fails.
+        """
+        try:
+            import urllib.request
+
+            url = (
+                f"https://archive-api.open-meteo.com/v1/archive"
+                f"?latitude={lat}&longitude={lon}"
+                f"&start_date={start_date.isoformat()}&end_date={end_date.isoformat()}"
+                f"&daily=temperature_2m_max,temperature_2m_min,"
+                f"temperature_2m_mean,precipitation_sum,"
+                f"windspeed_10m_max,shortwave_radiation_sum"
+                f"&timezone=auto"
+            )
+            req = urllib.request.Request(url, headers={"User-Agent": "AgroVisus/1.0"})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                raw = json.loads(response.read().decode())
+
+            daily = raw.get("daily", {})
+            times = daily.get("time", [])
+            if not times:
+                return
+
+            t_max_list   = daily.get("temperature_2m_max", [])
+            t_min_list   = daily.get("temperature_2m_min", [])
+            t_mean_list  = daily.get("temperature_2m_mean", [None] * len(times))
+            precip_list  = daily.get("precipitation_sum", [0.0] * len(times))
+            wind_list    = daily.get("windspeed_10m_max", [2.0] * len(times))
+            solar_list   = daily.get("shortwave_radiation_sum", [None] * len(times))
+
+            for i, date_str in enumerate(times):
+                d = date.fromisoformat(date_str)
+                t_max  = t_max_list[i] if i < len(t_max_list) else 25.0
+                t_min  = t_min_list[i] if i < len(t_min_list) else 15.0
+                t_mean = t_mean_list[i] if (i < len(t_mean_list) and t_mean_list[i] is not None) else (t_max + t_min) / 2.0
+                precip = precip_list[i] or 0.0 if i < len(precip_list) else 0.0
+                wind_max = wind_list[i] or 2.0 if i < len(wind_list) else 2.0
+                wind_avg_ms = (wind_max / 3.6) * 0.6
+                solar = solar_list[i] if (i < len(solar_list) and solar_list[i] is not None) else self._estimate_solar_radiation(lat, d, 60.0)
+                diurnal_range = max(1, t_max - t_min)
+                est_humidity = max(30.0, min(95.0, 85.0 - diurnal_range * 1.5))
+                self._openmeteo_daily_cache[d] = {
+                    "total_precip_mm":        round(float(precip), 2),
+                    "avg_temp_c":             round(float(t_mean), 2),
+                    "min_temp_c":             round(float(t_min),  2),
+                    "max_temp_c":             round(float(t_max),  2),
+                    "avg_humidity":           round(est_humidity,  2),
+                    "max_humidity_percent":   round(min(100.0, est_humidity + 15.0), 2),
+                    "avg_wind_speed_m_s":     round(wind_avg_ms,  2),
+                    "total_solar_rad_mj_m2":  round(float(solar), 2),
+                }
+
+            logger.info(
+                f"Weather prefetch complete: {len(self._openmeteo_daily_cache)} days "
+                f"({start_date} to {end_date}) in one API call."
+            )
+        except Exception as e:
+            logger.warning(f"Open-Meteo prefetch failed, will fetch per-day: {e}")
 
     # ── Data Quality Validation ─────────────────────────────────
 
@@ -531,7 +599,11 @@ class WeatherService:
         Covers historical data from 1940 to present-5 days.
         https://open-meteo.com/en/docs/historical-weather-api
         """
-        # Check cache first
+        # Check prefetched in-memory cache first (populated by prefetch_date_range)
+        if target_date in self._openmeteo_daily_cache:
+            return self._openmeteo_daily_cache[target_date]
+
+        # Check disk cache
         cache_key_prefix = "openmeteo"
         cache_path = os.path.join(
             CACHE_DIR,
