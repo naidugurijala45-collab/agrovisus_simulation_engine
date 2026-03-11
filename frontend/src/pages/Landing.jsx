@@ -1,315 +1,332 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from "react";
 
-/* ── Animated Counter ──────────────────────────────────────────────────── */
-function AnimatedCounter({ target, suffix = '', duration = 2000, prefix = '' }) {
-    const [count, setCount] = useState(0);
-    const ref = useRef(null);
-    const started = useRef(false);
+const crops = [
+  { name: "Corn", icon: "🌽", acres: "91.5M", rank: "#1", color: "#f59e0b" },
+  { name: "Soybean", icon: "🫘", acres: "86.1M", rank: "#2", color: "#84cc16" },
+  { name: "Wheat", icon: "🌾", acres: "33.8M", rank: "#3", color: "#d97706" },
+  { name: "Rice", icon: "🌿", acres: "2.87M", rank: "#6", color: "#34d399" },
+  { name: "Sorghum", icon: "🌱", acres: "5.5M", rank: "#7", color: "#a3e635" },
+];
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(([entry]) => {
-            if (entry.isIntersecting && !started.current) {
-                started.current = true;
-                const startTime = performance.now();
-                const isFloat = String(target).includes('.');
-                const targetNum = parseFloat(target);
-                const step = (now) => {
-                    const elapsed = now - startTime;
-                    const progress = Math.min(elapsed / duration, 1);
-                    const eased = 1 - Math.pow(1 - progress, 4);
-                    const val = eased * targetNum;
-                    setCount(isFloat ? parseFloat(val.toFixed(1)) : Math.floor(val));
-                    if (progress < 1) requestAnimationFrame(step);
-                    else setCount(targetNum);
-                };
-                requestAnimationFrame(step);
-            }
-        }, { threshold: 0.3 });
-        if (ref.current) observer.observe(ref.current);
-        return () => observer.disconnect();
-    }, [target, duration]);
+const stats = [
+  { value: "6,223", unit: "kg/ha", label: "Validated corn yield accuracy", sub: "vs 8,992 AquaCrop upper bound" },
+  { value: "31%", unit: "gap", label: "From theoretical maximum", sub: "explained by real stress conditions" },
+  { value: "110", unit: "tests", label: "All passing, zero regressions", sub: "DSSAT · FAO-56 · USDA-ARS validated" },
+  { value: "4", unit: "regions", label: "US Corn Belt coverage", sub: "OH · IN · IL · IA · KS · GA and more" },
+];
 
-    return <span ref={ref}>{prefix}{count}{suffix}</span>;
+function useInView(threshold = 0.15) {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setInView(true); }, { threshold });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, inView];
 }
 
-/* ── Particle Grid Background ─────────────────────────────────────────── */
-function ParticleField() {
-    const dots = Array.from({ length: 80 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: Math.random() * 2 + 1,
-        delay: Math.random() * 6,
-        duration: Math.random() * 4 + 4,
-    }));
-    return (
-        <div className="particle-field" aria-hidden>
-            {dots.map((d) => (
-                <div key={d.id} className="particle-dot" style={{
-                    left: `${d.x}%`, top: `${d.y}%`,
-                    width: d.size, height: d.size,
-                    animationDelay: `${d.delay}s`,
-                    animationDuration: `${d.duration}s`,
-                }} />
-            ))}
+function StatCard({ value, unit, label, sub, delay }) {
+  const [ref, inView] = useInView();
+  return (
+    <div ref={ref} style={{
+      opacity: inView ? 1 : 0,
+      transform: inView ? "translateY(0)" : "translateY(32px)",
+      transition: `all 0.7s cubic-bezier(.22,1,.36,1) ${delay}ms`,
+      background: "rgba(255,255,255,0.02)",
+      border: "1px solid rgba(74,222,128,0.1)",
+      borderTop: "2px solid rgba(74,222,128,0.4)",
+      borderRadius: "2px",
+      padding: "32px 28px",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(74,222,128,0.6), transparent)",
+      }} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "8px" }}>
+        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "52px", color: "#4ade80", lineHeight: 1, letterSpacing: "0.02em" }}>
+          {value}
+        </span>
+        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "22px", color: "rgba(74,222,128,0.5)", letterSpacing: "0.05em" }}>
+          {unit}
+        </span>
+      </div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "rgba(255,255,255,0.7)", marginBottom: "4px", fontWeight: 500 }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "rgba(74,222,128,0.4)", letterSpacing: "0.08em" }}>
+        {sub}
+      </div>
+    </div>
+  );
+}
+
+function CropCard({ crop, delay }) {
+  const [ref, inView] = useInView();
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div ref={ref} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? "translateY(0) scale(1)" : "translateY(24px) scale(0.97)",
+        transition: `all 0.6s cubic-bezier(.22,1,.36,1) ${delay}ms, background 0.2s, border 0.2s`,
+        background: hovered ? "rgba(74,222,128,0.05)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${hovered ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.06)"}`,
+        borderRadius: "4px",
+        padding: "28px 24px",
+        cursor: "default",
+        position: "relative",
+      }}>
+      <div style={{
+        position: "absolute", top: "12px", right: "14px",
+        fontFamily: "'DM Mono', monospace", fontSize: "9px",
+        color: crop.color, opacity: 0.7, letterSpacing: "0.12em",
+      }}>
+        {crop.rank} US
+      </div>
+      <div style={{ fontSize: "36px", marginBottom: "12px" }}>{crop.icon}</div>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "22px", color: "rgba(255,255,255,0.9)", letterSpacing: "0.05em", marginBottom: "4px" }}>
+        {crop.name}
+      </div>
+      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>
+        {crop.acres} acres
+      </div>
+      <div style={{
+        marginTop: "16px", height: "2px", borderRadius: "1px",
+        background: `linear-gradient(90deg, ${crop.color}60, transparent)`,
+        width: hovered ? "100%" : "40%", transition: "width 0.3s ease",
+      }} />
+    </div>
+  );
+}
+
+export default function AgroVisusLanding() {
+  const [heroVisible, setHeroVisible] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [statsRef, statsInView] = useInView();
+  const [cropsRef, cropsInView] = useInView();
+
+  useEffect(() => {
+    setTimeout(() => setHeroVisible(true), 100);
+    const handleMouse = (e) => setMousePos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
+    window.addEventListener("mousemove", handleMouse);
+    return () => window.removeEventListener("mousemove", handleMouse);
+  }, []);
+
+  return (
+    <div style={{
+      background: "#080f09",
+      minHeight: "100vh",
+      fontFamily: "'DM Sans', sans-serif",
+      color: "white",
+      overflowX: "hidden",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #080f09; }
+        ::-webkit-scrollbar-thumb { background: rgba(74,222,128,0.3); border-radius: 2px; }
+      `}</style>
+
+      {/* Ambient glow that follows mouse */}
+      <div style={{
+        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
+        background: `radial-gradient(ellipse 80vw 60vh at ${mousePos.x * 100}% ${mousePos.y * 100}%, rgba(74,222,128,0.04) 0%, transparent 70%)`,
+        transition: "background 0.3s ease",
+      }} />
+
+      {/* Grid overlay */}
+      <div style={{
+        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, opacity: 0.025,
+        backgroundImage: "linear-gradient(rgba(74,222,128,1) 1px, transparent 1px), linear-gradient(90deg, rgba(74,222,128,1) 1px, transparent 1px)",
+        backgroundSize: "60px 60px",
+      }} />
+
+      {/* NAV */}
+      <nav style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        padding: "20px 48px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        borderBottom: "1px solid rgba(74,222,128,0.08)",
+        background: "rgba(8,15,9,0.85)", backdropFilter: "blur(20px)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{
+            width: "8px", height: "8px", borderRadius: "50%",
+            background: "#4ade80",
+            boxShadow: "0 0 12px #4ade80",
+            animation: "pulse 2s infinite",
+          }} />
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "22px", letterSpacing: "0.1em", color: "#4ade80" }}>
+            AGROVISUS
+          </span>
         </div>
-    );
-}
+        <div style={{
+          fontFamily: "'DM Mono', monospace", fontSize: "10px",
+          color: "rgba(74,222,128,0.5)", letterSpacing: "0.15em",
+        }}>
+          SIMULATION ENGINE v2.3
+        </div>
+      </nav>
 
-/* ── Floating Data Card ───────────────────────────────────────────────── */
-function FloatingDataCard() {
-    const bars = [45, 70, 55, 90, 65, 80, 75, 95];
-    return (
-        <div className="floating-card hero-data-card">
-            <div className="fdc-header">
-                <span className="fdc-dot green" />
-                <span className="fdc-title">Live Simulation</span>
-                <span className="badge badge-green" style={{ marginLeft: 'auto' }}>RUNNING</span>
+      {/* HERO */}
+      <section style={{
+        position: "relative", zIndex: 1,
+        minHeight: "100vh",
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        padding: "120px 48px 80px",
+        maxWidth: "1200px", margin: "0 auto",
+      }}>
+        {/* Eyebrow */}
+        <div style={{
+          opacity: heroVisible ? 1 : 0,
+          transform: heroVisible ? "translateY(0)" : "translateY(16px)",
+          transition: "all 0.8s cubic-bezier(.22,1,.36,1) 0.1s",
+          display: "flex", alignItems: "center", gap: "12px", marginBottom: "32px",
+        }}>
+          <div style={{ width: "32px", height: "1px", background: "rgba(74,222,128,0.5)" }} />
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "11px", color: "rgba(74,222,128,0.6)", letterSpacing: "0.2em" }}>
+            PRECISION AGRONOMIC INTELLIGENCE
+          </span>
+        </div>
+
+        {/* Headline */}
+        <h1 style={{
+          opacity: heroVisible ? 1 : 0,
+          transform: heroVisible ? "translateY(0)" : "translateY(24px)",
+          transition: "all 0.9s cubic-bezier(.22,1,.36,1) 0.2s",
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: "clamp(64px, 10vw, 128px)",
+          lineHeight: 0.92,
+          letterSpacing: "0.02em",
+          marginBottom: "32px",
+        }}>
+          <span style={{ color: "rgba(255,255,255,0.95)", display: "block" }}>YOUR FIELD</span>
+          <span style={{ color: "rgba(255,255,255,0.95)", display: "block" }}>HAS A</span>
+          <span style={{
+            display: "block",
+            background: "linear-gradient(135deg, #4ade80 0%, #86efac 50%, #4ade80 100%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundSize: "200%",
+            animation: "shimmer 3s infinite linear",
+          }}>DIAGNOSIS.</span>
+        </h1>
+
+        {/* Subheadline */}
+        <p style={{
+          opacity: heroVisible ? 1 : 0,
+          transform: heroVisible ? "translateY(0)" : "translateY(20px)",
+          transition: "all 0.9s cubic-bezier(.22,1,.36,1) 0.35s",
+          fontSize: "18px", fontWeight: 300,
+          color: "rgba(255,255,255,0.45)",
+          maxWidth: "520px", lineHeight: 1.7,
+          marginBottom: "48px",
+        }}>
+          AgroVisus runs a daily field simulation — tracking disease pressure, nutrient stress, and water balance — then tells you exactly what it will cost you if you don't act, and what you gain if you do.
+        </p>
+
+        {/* Metrics strip */}
+        <div style={{
+          opacity: heroVisible ? 1 : 0,
+          transform: heroVisible ? "translateY(0)" : "translateY(16px)",
+          transition: "all 0.9s cubic-bezier(.22,1,.36,1) 0.5s",
+          display: "flex", gap: "32px", flexWrap: "wrap",
+        }}>
+          {[
+            { label: "Crops modeled", val: "5" },
+            { label: "US regions covered", val: "4" },
+            { label: "Data sources", val: "FAO-56 · DSSAT · USDA" },
+          ].map((m, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ width: "1px", height: "32px", background: "rgba(74,222,128,0.25)" }} />
+              <div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "20px", color: "#4ade80", letterSpacing: "0.05em" }}>{m.val}</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em" }}>{m.label}</div>
+              </div>
             </div>
-            <div className="fdc-chart">
-                {bars.map((h, i) => (
-                    <div key={i} className="fdc-bar-wrap">
-                        <div className="fdc-bar" style={{
-                            height: `${h}%`,
-                            animationDelay: `${i * 0.15}s`,
-                        }} />
-                    </div>
-                ))}
-            </div>
-            <div className="fdc-stats">
-                <div><div className="fdc-stat-val text-green">8,420</div><div className="fdc-stat-lbl">kg/ha</div></div>
-                <div><div className="fdc-stat-val" style={{ color: '#38bdf8' }}>72%</div><div className="fdc-stat-lbl">Water Eff.</div></div>
-                <div><div className="fdc-stat-val" style={{ color: '#c084fc' }}>Day 67</div><div className="fdc-stat-lbl">Progress</div></div>
-            </div>
+          ))}
         </div>
-    );
-}
 
-/* ── DNA Helix Decoration ─────────────────────────────────────────────── */
-function HelixDecoration() {
-    const nodes = Array.from({ length: 12 }, (_, i) => i);
-    return (
-        <div className="helix-wrap" aria-hidden>
-            {nodes.map((i) => (
-                <div key={i} className="helix-row" style={{ animationDelay: `${i * 0.15}s` }}>
-                    <div className="helix-node left" style={{ animationDelay: `${i * 0.15}s` }} />
-                    <div className="helix-line" />
-                    <div className="helix-node right" style={{ animationDelay: `${i * 0.15 + 0.5}s` }} />
-                </div>
-            ))}
+        {/* Scroll hint */}
+        <div style={{
+          position: "absolute", bottom: "40px", left: "48px",
+          opacity: heroVisible ? 0.4 : 0, transition: "opacity 1s 1.2s",
+          display: "flex", alignItems: "center", gap: "8px",
+          fontFamily: "'DM Mono', monospace", fontSize: "9px",
+          color: "rgba(74,222,128,0.6)", letterSpacing: "0.15em",
+          animation: "bounce 2s 2s infinite",
+        }}>
+          ↓ SCROLL
         </div>
-    );
-}
+      </section>
 
-/* ── Main Landing ─────────────────────────────────────────────────────── */
-export default function Landing() {
-    const navigate = useNavigate();
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-    useEffect(() => {
-        const handler = (e) => setMousePos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
-        window.addEventListener('mousemove', handler);
-        return () => window.removeEventListener('mousemove', handler);
-    }, []);
-
-    const parallaxX = (mousePos.x - 0.5) * 20;
-    const parallaxY = (mousePos.y - 0.5) * 20;
-
-    return (
-        <div className="landing-root">
-
-            {/* ── HERO ──────────────────────────────────────────────────────── */}
-            <section className="lp-hero">
-                <ParticleField />
-                {/* Radial glow that follows mouse */}
-                <div className="cursor-glow" style={{
-                    left: `${mousePos.x * 100}%`,
-                    top: `${mousePos.y * 100}%`,
-                }} />
-
-                <div className="lp-hero-grid">
-                    {/* Left: Text */}
-                    <div className="lp-hero-text">
-                        <div className="lp-eyebrow">
-                            <span className="eyebrow-dot" />
-                            <span>AI-Powered Precision Agriculture</span>
-                        </div>
-
-                        <h1 className="lp-h1">
-                            <span className="lp-h1-line">The Future of</span>
-                            <span className="lp-h1-line gradient-text">Crop Intelligence</span>
-                            <span className="lp-h1-line">Starts Here.</span>
-                        </h1>
-
-                        <p className="lp-subtext">
-                            AgroVisus fuses physics-based simulation, reinforcement learning, and
-                            AI diagnostics into one platform — telling farmers exactly when and
-                            how much to irrigate, fertilise, and act.
-                        </p>
-
-                        <div className="lp-cta-row">
-                            <button className="btn-hero-primary" onClick={() => navigate('/simulate')}>
-                                <span className="btn-hero-glow" />
-                                <span className="btn-hero-text">🌱 Run Simulation</span>
-                            </button>
-                            <button className="btn-hero-secondary" onClick={() => navigate('/disease')}>
-                                <span>🦠 Diagnose a Crop</span>
-                            </button>
-                        </div>
-
-                        <div className="lp-trust-row">
-                            {['Physics-Based Engine', 'PPO RL Agent', 'Real Weather Data'].map((t) => (
-                                <div key={t} className="lp-trust-pill">
-                                    <span className="trust-check">✓</span> {t}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Right: Floating visual */}
-                    <div className="lp-hero-visual" style={{
-                        transform: `translate(${parallaxX}px, ${parallaxY}px)`,
-                    }}>
-                        <div className="hero-visual-glow" />
-                        <FloatingDataCard />
-                        <HelixDecoration />
-
-                        {/* Orbiting badges */}
-                        <div className="orbit-badge" style={{ top: '8%', right: '10%', animationDelay: '0s' }}>
-                            <span>🛰️ Satellite</span>
-                        </div>
-                        <div className="orbit-badge" style={{ bottom: '20%', left: '-5%', animationDelay: '1.2s' }}>
-                            <span>🤖 PPO Agent</span>
-                        </div>
-                        <div className="orbit-badge" style={{ top: '55%', right: '-8%', animationDelay: '0.6s' }}>
-                            <span>⚡ 200k Steps</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Scroll cue */}
-                <div className="scroll-cue">
-                    <div className="scroll-arrow" />
-                </div>
-            </section>
-
-            {/* ── STATS BAND ────────────────────────────────────────────────── */}
-            <section className="lp-stats-band">
-                <div className="stats-band-inner">
-                    {[
-                        { val: 30, suffix: '%', label: 'Water Saved', color: '#38bdf8', icon: '💧' },
-                        { val: 15, suffix: '%', label: 'Yield Gained', color: '#22c55e', icon: '🌾' },
-                        { val: 18, suffix: '%', label: 'N-Waste Cut', color: '#c084fc', icon: '🧬' },
-                        { val: 200, suffix: 'k', label: 'Training Steps', color: '#fbbf24', icon: '🤖' },
-                    ].map((s) => (
-                        <div key={s.label} className="stat-band-card">
-                            <div className="sbc-icon">{s.icon}</div>
-                            <div className="sbc-val" style={{ color: s.color }}>
-                                <AnimatedCounter target={s.val} suffix={s.suffix} />
-                            </div>
-                            <div className="sbc-label">{s.label}</div>
-                            <div className="sbc-glow" style={{ background: s.color }} />
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ── FEATURES ──────────────────────────────────────────────────── */}
-            <section className="lp-features">
-                <div className="lp-section-header">
-                    <span className="section-chip">Core Capabilities</span>
-                    <h2 className="lp-section-title">Built for the <span className="gradient-text">precision farmer</span></h2>
-                    <p className="lp-section-sub">Four integrated modules that work together to maximise yield and minimise waste.</p>
-                </div>
-
-                <div className="features-grid">
-                    {[
-                        {
-                            icon: '🌱', color: '#22c55e', glow: 'rgba(34,197,94,0.15)',
-                            title: 'Crop Simulation Engine',
-                            desc: 'Physics-based simulation with GDD accumulation, water balance, nutrient cycling, disease pressure, and daily stage tracking.',
-                            tags: ['Biomass', 'Soil Water', 'Disease'],
-                        },
-                        {
-                            icon: '🤖', color: '#a78bfa', glow: 'rgba(167,139,250,0.15)',
-                            title: 'Reinforcement Learning Agent',
-                            desc: 'PPO v3 agent trained for 200,000 timesteps learns optimal irrigation and fertilization schedules across randomized growing seasons.',
-                            tags: ['PPO', 'Stable-Baselines3', 'Reward Shaping'],
-                        },
-                        {
-                            icon: '🦠', color: '#f87171', glow: 'rgba(248,113,113,0.15)',
-                            title: 'AI Disease Diagnostics',
-                            desc: 'Upload a leaf photo for instant AI-powered diagnosis with confidence scores, severity classification, and treatment recommendations.',
-                            tags: ['Image Upload', 'CNN Ready', 'Actionable Advice'],
-                        },
-                        {
-                            icon: '📊', color: '#fbbf24', glow: 'rgba(251,191,36,0.15)',
-                            title: 'Smart Reporting & Export',
-                            desc: 'Multi-run report history with filterable KPIs, interactive time-series charts, triggered advisory alerts, and CSV/PDF export.',
-                            tags: ['CSV Export', 'Run History', 'AI vs Random'],
-                        },
-                    ].map((f) => (
-                        <div key={f.title} className="feature-panel" style={{ '--accent': f.color, '--glow': f.glow }}>
-                            <div className="fp-icon-wrap" style={{ background: f.glow }}>
-                                <span className="fp-icon">{f.icon}</span>
-                            </div>
-                            <h3 className="fp-title">{f.title}</h3>
-                            <p className="fp-desc">{f.desc}</p>
-                            <div className="fp-tags">
-                                {f.tags.map((t) => (
-                                    <span key={t} className="fp-tag" style={{ borderColor: f.color, color: f.color }}>{t}</span>
-                                ))}
-                            </div>
-                            <div className="fp-glow-corner" style={{ background: f.glow }} />
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
-            <section className="lp-how">
-                <div className="lp-section-header">
-                    <span className="section-chip">Workflow</span>
-                    <h2 className="lp-section-title">From seed to <span className="gradient-text">harvest insight</span></h2>
-                </div>
-                <div className="how-steps">
-                    {[
-                        { num: '01', icon: '⚙️', title: 'Configure', desc: 'Choose your crop, field location, soil type, and season length.' },
-                        { num: '02', icon: '🔬', title: 'Simulate', desc: 'Run a full-season growth model using live weather and soil data.' },
-                        { num: '03', icon: '🤖', title: 'Optimize', desc: 'AI finds the irrigation and fertilization plan that maximizes your yield.' },
-                        { num: '04', icon: '📈', title: 'Act', desc: 'Receive day-by-day field recommendations you can put to work immediately.' },
-                    ].map((s, i) => (
-                        <div key={s.num} className="how-step">
-                            <div className="hs-num">{s.num}</div>
-                            <div className="hs-icon">{s.icon}</div>
-                            <h4 className="hs-title">{s.title}</h4>
-                            <p className="hs-desc">{s.desc}</p>
-                            {i < 3 && <div className="hs-connector" />}
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ── CTA BANNER ────────────────────────────────────────────────── */}
-            <section className="lp-cta-banner">
-                <div className="cta-banner-glow" />
-                <div className="cta-banner-content">
-                    <h2 className="cta-banner-title">Ready to grow smarter?</h2>
-                    <p className="cta-banner-sub">Launch a simulation in under 30 seconds. No setup required.</p>
-                    <button className="btn-hero-primary" onClick={() => navigate('/simulate')} style={{ margin: '0 auto' }}>
-                        <span className="btn-hero-glow" />
-                        <span className="btn-hero-text">🚀 Start Simulation Now</span>
-                    </button>
-                </div>
-                {/* Decorative field rows */}
-                <div className="field-rows" aria-hidden>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="field-row" style={{ animationDelay: `${i * 0.2}s` }} />
-                    ))}
-                </div>
-            </section>
-
+      {/* STATS */}
+      <section style={{ position: "relative", zIndex: 1, padding: "80px 48px", maxWidth: "1200px", margin: "0 auto" }}>
+        <div ref={statsRef} style={{
+          opacity: statsInView ? 1 : 0,
+          transform: statsInView ? "translateY(0)" : "translateY(24px)",
+          transition: "all 0.7s ease",
+          display: "flex", alignItems: "center", gap: "16px", marginBottom: "48px",
+        }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "rgba(74,222,128,0.5)", letterSpacing: "0.2em" }}>
+            ENGINE VALIDATION
+          </span>
+          <div style={{ flex: 1, height: "1px", background: "rgba(74,222,128,0.1)" }} />
         </div>
-    );
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+          {stats.map((s, i) => <StatCard key={i} {...s} delay={i * 100} />)}
+        </div>
+      </section>
+
+      {/* CROPS */}
+      <section style={{ position: "relative", zIndex: 1, padding: "80px 48px 120px", maxWidth: "1200px", margin: "0 auto" }}>
+        <div ref={cropsRef} style={{
+          opacity: cropsInView ? 1 : 0,
+          transform: cropsInView ? "translateY(0)" : "translateY(24px)",
+          transition: "all 0.7s ease",
+          display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px",
+        }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "rgba(74,222,128,0.5)", letterSpacing: "0.2em" }}>
+            SUPPORTED CROPS
+          </span>
+          <div style={{ flex: 1, height: "1px", background: "rgba(74,222,128,0.1)" }} />
+        </div>
+        <p style={{
+          opacity: cropsInView ? 1 : 0, transition: "opacity 0.7s 0.1s",
+          fontFamily: "'DM Sans', sans-serif", fontSize: "14px",
+          color: "rgba(255,255,255,0.3)", marginBottom: "40px", maxWidth: "480px",
+        }}>
+          Covering 223M acres of US cropland — the five highest-value row crops with scientifically grounded templates from FAO-56, DSSAT v4.8, and USDA-ARS.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+          {crops.map((c, i) => <CropCard key={i} crop={c} delay={i * 80} />)}
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{
+        position: "relative", zIndex: 1,
+        borderTop: "1px solid rgba(74,222,128,0.08)",
+        padding: "32px 48px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: "16px",
+      }}>
+        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "16px", color: "rgba(74,222,128,0.3)", letterSpacing: "0.1em" }}>
+          AGROVISUS
+        </span>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", color: "rgba(255,255,255,0.15)", letterSpacing: "0.1em" }}>
+          BUILT ON FAO-56 · DSSAT v4.8 · USDA-ARS · ICAR
+        </span>
+      </footer>
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+      `}</style>
+    </div>
+  );
 }
