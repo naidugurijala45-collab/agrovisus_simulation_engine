@@ -229,7 +229,17 @@ class WeatherService:
         Results are stored in self._openmeteo_daily_cache so per-day calls in
         get_daily_weather() skip the network entirely and return instantly.
         Falls back silently — per-day fetches still work if this fails.
+        Open-Meteo Archive only covers data up to ~5 days ago; skip the call
+        for current or future date ranges (synthetic will be used instead).
         """
+        cutoff = date.today() - timedelta(days=5)
+        # If the entire range is beyond the archive cutoff, nothing to fetch
+        if start_date >= cutoff:
+            logger.info("Prefetch skipped: date range is too recent for Open-Meteo Archive.")
+            return
+        # Clamp end_date to what the archive actually has
+        effective_end = min(end_date, cutoff)
+        end_date = effective_end
         try:
             import urllib.request
 
@@ -602,6 +612,12 @@ class WeatherService:
         # Check prefetched in-memory cache first (populated by prefetch_date_range)
         if target_date in self._openmeteo_daily_cache:
             return self._openmeteo_daily_cache[target_date]
+
+        # Open-Meteo Archive API only has data up to ~5 days ago.
+        # For recent or future dates, skip the HTTP call entirely.
+        from datetime import date as _date
+        if target_date >= _date.today() - timedelta(days=5):
+            return None
 
         # Check disk cache
         cache_key_prefix = "openmeteo"
