@@ -1,6 +1,7 @@
 """
 Simulation Router — runs crop simulations and returns time-series results.
 """
+import asyncio
 import json
 import os
 import sys
@@ -167,7 +168,7 @@ def _deduplicate_triggered_rules(enriched_rules: List[Dict[str, Any]]) -> List[D
 # ── Routes ─────────────────────────────────────────────────────────────────
 
 @router.post("/run", response_model=SimulationResult)
-def run_simulation(req: SimulationRequest):
+async def run_simulation(req: SimulationRequest):
     """Run a full crop simulation and return daily time-series data."""
     logger.info(f"Running simulation: crop={req.crop_template}, days={req.sim_days}")
     try:
@@ -189,7 +190,8 @@ def run_simulation(req: SimulationRequest):
         with tempfile.NamedTemporaryFile(mode='w', suffix=".csv", delete=False) as tmp:
             tmp_path = tmp.name
 
-        result = service.run_simulation(
+        result = await asyncio.to_thread(
+            service.run_simulation,
             start_date=start_date,
             sim_days=req.sim_days,
             output_csv_path=tmp_path,

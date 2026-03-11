@@ -372,6 +372,7 @@ class SimulationService:
         ]
 
         all_triggered_rules_over_time = []
+        all_rows = []
         csv_file = None
         
         try:
@@ -443,12 +444,11 @@ class SimulationService:
                 }
 
                 # 3. Update Models
-                current_crop_stage_before_update = self.crop_model.get_status()["current_stage"]
+                # Single get_status() call — reuse dict for both kc and root_depth lookups
+                crop_status_before_update = self.crop_model.get_status()
+                current_crop_stage_before_update = crop_status_before_update["current_stage"]
                 kc_map = self.crop_config_conf.get("kc_per_stage", {})
                 kc_today = kc_map.get(current_crop_stage_before_update, self.crop_config_conf.get("kc_fallback", 0.7))
-
-                # Phase 2: Dynamic root depth passed to soil model
-                crop_status_before_update = self.crop_model.get_status() # Moved up to get root_depth
                 root_depth = crop_status_before_update.get('root_depth_mm', 50.0)
                 
                 soil_updates = self.soil_model.update_daily(
@@ -534,8 +534,9 @@ class SimulationService:
                     daily_fertilization_events=daily_fertilization_events,
                     triggered_rules_for_day=triggered_rules_list
                 )
-                csv_writer.writerow(daily_report_data)
+                all_rows.append(daily_report_data)
 
+            csv_writer.writerows(all_rows)
             self.logger.info("\n--- SIMULATION COMPLETE ---")
             final_yield = self.crop_model.get_final_yield()
             self.logger.info(f"Total Biomass Accumulated: {self.crop_model.total_biomass_kg_ha:.2f} kg/ha")
