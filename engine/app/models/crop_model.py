@@ -138,7 +138,10 @@ class CropModel:
         )
 
         potential_daily_gdd = self._calculate_daily_gdd(t_min_c, t_max_c)
-        effective_daily_gdd = potential_daily_gdd * overall_stress_factor
+        # GDD is thermal time driven by temperature only — stress never changes
+        # air temperature, so no stress scalar here. Stress is applied to
+        # biomass accumulation below (the single correct place).
+        effective_daily_gdd = potential_daily_gdd
         self.accumulated_gdd += effective_daily_gdd
         
         # --- Root Growth ---
@@ -184,16 +187,16 @@ class CropModel:
             self.current_stage = new_stage_reached
 
     def get_final_yield(self) -> float:
-        """Calculates final grain yield."""
-        # Phase 1: Yield is the Reproductive Biomass (Grain), heavily impacted by late-season conditions
-        # We verify if we even reached reproductive stage
+        """Calculates final grain yield using harvest index (DSSAT/AquaCrop approach).
+
+        harvest_index partitions biomass into grain fraction.  Stress has
+        already been applied to daily biomass accumulation; applying HI here
+        does NOT double-count stress — it separates grain from total crop mass.
+        """
         if self.reproductive_biomass_kg_ha > 0:
-            # We might still apply a small harvest index for hull/imperfections, but 
-            # essentially, reproductive biomass IS the yield now.
-            return self.reproductive_biomass_kg_ha
-        else:
-             # If we never flowered, yield is 0 (fodder only)
-            return 0.0
+            return self.reproductive_biomass_kg_ha * self.harvest_index
+        # Crop never reached flowering — scale total biomass as fallback estimate
+        return self.total_biomass_kg_ha * self.harvest_index
 
     def get_lai(self) -> float:
         """
