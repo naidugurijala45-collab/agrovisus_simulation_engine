@@ -112,8 +112,8 @@
             "total_N_kg_ha": 180.0,
             "total_P_kg_ha": 80.0,
             "total_K_kg_ha": 100.0,
-            "initial_nitrate_N_kg_ha": 20.0,
-            "initial_ammonium_N_kg_ha": 5.0,
+            "initial_nitrate_N_kg_ha": 40.0,
+            "initial_ammonium_N_kg_ha": 10.0,
             "split_application": true,
             "application_schedule": [
                 {

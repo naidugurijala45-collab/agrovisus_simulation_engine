@@ -250,8 +250,31 @@ export default function Simulate() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const [fertEvents, setFertEvents] = useState([{ id: 1, day: 7, amount: 80, fertType: 'urea' }]);
+    const [irrigEvents, setIrrigEvents] = useState([]);
+    const [newFert, setNewFert] = useState({ day: '', amount: '', fertType: 'urea' });
+    const [newIrrig, setNewIrrig] = useState({ day: '', amount: '' });
+
     const abortControllerRef = useRef(null);
     const reportRef = useRef(null);
+
+    const addFertEvent = () => {
+        const day = parseInt(newFert.day);
+        const amount = parseFloat(newFert.amount);
+        if (!day || !amount || day < 1 || day > 150) return;
+        setFertEvents(prev => [...prev, { id: Date.now(), day, amount, fertType: newFert.fertType }]);
+        setNewFert({ day: '', amount: '', fertType: 'urea' });
+    };
+    const removeFertEvent = (id) => setFertEvents(prev => prev.filter(e => e.id !== id));
+
+    const addIrrigEvent = () => {
+        const day = parseInt(newIrrig.day);
+        const amount = parseFloat(newIrrig.amount);
+        if (!day || !amount || day < 1 || day > 150) return;
+        setIrrigEvents(prev => [...prev, { id: Date.now(), day, amount }]);
+        setNewIrrig({ day: '', amount: '' });
+    };
+    const removeIrrigEvent = (id) => setIrrigEvents(prev => prev.filter(e => e.id !== id));
 
     useEffect(() => {
         try { sessionStorage.setItem('agrovisus_sim_form', JSON.stringify(form)); } catch {}
@@ -287,7 +310,10 @@ export default function Simulate() {
         try {
             const payload = {
                 ...form,
-                management_schedule: [],
+                management_schedule: [
+                    ...fertEvents.map(e => ({ type: 'fertilizer', day: e.day, amount_kg_ha: e.amount, fertilizer_type: e.fertType })),
+                    ...irrigEvents.map(e => ({ type: 'irrigation', day: e.day, amount_mm: e.amount })),
+                ].sort((a, b) => a.day - b.day),
                 state_code: form.state_code || null,
                 field_acres: parseFloat(form.field_acres) || 100,
                 treatment_cost_per_acre: parseFloat(form.treatment_cost_per_acre) || 25,
@@ -391,6 +417,145 @@ export default function Simulate() {
                         commodityPrice={form.commodity_price_usd_bu}
                         onChange={(key, value) => setForm(f => ({ ...f, [key]: value }))}
                     />
+                </div>
+
+                {/* Field Management */}
+                <div style={{ marginBottom: 20 }}>
+                    <div style={{
+                        fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                        color: 'var(--text-muted)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                        <span>Field Management</span>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                    </div>
+
+                    {/* Fertilizer */}
+                    <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            Fertilizer Applications
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.68rem' }}>Day (1–150)</label>
+                                <input
+                                    className="form-input"
+                                    type="number" min={1} max={150} placeholder="10"
+                                    value={newFert.day}
+                                    onChange={e => setNewFert(f => ({ ...f, day: e.target.value }))}
+                                    style={{ width: 80 }}
+                                />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.68rem' }}>kg N/ha</label>
+                                <input
+                                    className="form-input"
+                                    type="number" min={1} placeholder="80"
+                                    value={newFert.amount}
+                                    onChange={e => setNewFert(f => ({ ...f, amount: e.target.value }))}
+                                    style={{ width: 90 }}
+                                />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.68rem' }}>Type</label>
+                                <select
+                                    className="form-select"
+                                    value={newFert.fertType}
+                                    onChange={e => setNewFert(f => ({ ...f, fertType: e.target.value }))}
+                                    style={{ width: 110 }}
+                                >
+                                    <option value="urea">Urea</option>
+                                    <option value="nitrate">Nitrate</option>
+                                    <option value="ammonium">Ammonium</option>
+                                </select>
+                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{ padding: '7px 14px', fontSize: '0.78rem', height: 36, alignSelf: 'flex-end' }}
+                                onClick={addFertEvent}
+                            >
+                                + Add Fertilizer Application
+                            </button>
+                        </div>
+                        {fertEvents.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {fertEvents.map(e => (
+                                    <div key={e.id} style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                                        padding: '4px 10px', borderRadius: 999,
+                                        background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)',
+                                        fontSize: '0.78rem', color: 'var(--text-secondary)',
+                                    }}>
+                                        <span style={{ color: 'var(--green-400)', fontWeight: 600 }}>Day {e.day}</span>
+                                        &mdash; {e.amount} kg N/ha ({e.fertType})
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFertEvent(e.id)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1, fontSize: '0.85rem' }}
+                                        >✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Irrigation */}
+                    <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            Irrigation Events
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.68rem' }}>Day (1–150)</label>
+                                <input
+                                    className="form-input"
+                                    type="number" min={1} max={150} placeholder="15"
+                                    value={newIrrig.day}
+                                    onChange={e => setNewIrrig(f => ({ ...f, day: e.target.value }))}
+                                    style={{ width: 80 }}
+                                />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: '0.68rem' }}>Amount (mm)</label>
+                                <input
+                                    className="form-input"
+                                    type="number" min={1} placeholder="25"
+                                    value={newIrrig.amount}
+                                    onChange={e => setNewIrrig(f => ({ ...f, amount: e.target.value }))}
+                                    style={{ width: 90 }}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{ padding: '7px 14px', fontSize: '0.78rem', height: 36, alignSelf: 'flex-end' }}
+                                onClick={addIrrigEvent}
+                            >
+                                + Add Irrigation Event
+                            </button>
+                        </div>
+                        {irrigEvents.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {irrigEvents.map(e => (
+                                    <div key={e.id} style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                                        padding: '4px 10px', borderRadius: 999,
+                                        background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)',
+                                        fontSize: '0.78rem', color: 'var(--text-secondary)',
+                                    }}>
+                                        <span style={{ color: '#38bdf8', fontWeight: 600 }}>Day {e.day}</span>
+                                        &mdash; {e.amount}mm
+                                        <button
+                                            type="button"
+                                            onClick={() => removeIrrigEvent(e.id)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1, fontSize: '0.85rem' }}
+                                        >✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 12 }}>
