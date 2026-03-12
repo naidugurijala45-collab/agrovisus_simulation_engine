@@ -137,41 +137,12 @@ class CropModel:
             self.nitrogen_stress_factor, self.water_stress_factor, disease_stress_factor
         )
 
-        potential_daily_gdd = self._calculate_daily_gdd(t_min_c, t_max_c)
-        # GDD is thermal time driven by temperature only — stress never changes
-        # air temperature, so no stress scalar here. Stress is applied to
-        # biomass accumulation below (the single correct place).
-        effective_daily_gdd = potential_daily_gdd
-        self.accumulated_gdd += effective_daily_gdd
-        
-        # --- Root Growth ---
-        # Roots grow during vegetative stages, stop at reproductive stages
-        if self.current_stage in self.vegetative_stages:
-            growth_today = self.daily_root_growth_rate_mm * overall_stress_factor
-            self.root_depth_mm = min(self.max_root_depth_mm, self.root_depth_mm + growth_today)
-
-        light_interception = self.light_interception_per_stage.get(
-            self.current_stage, 0.1
-        )
-        potential_biomass_gain_g_m2 = (
-            solar_rad_mj_m2 * self.rue_g_mj * light_interception
-        )
-        actual_biomass_gain_g_m2 = potential_biomass_gain_g_m2 * overall_stress_factor
-        actual_biomass_gain_kg_ha = (
-            actual_biomass_gain_g_m2 * 10
-        )  # Convert g/m^2 to kg/ha
-        
-        # --- Biomass Partitioning ---
-        # Before reproductive: all to Veg. After: all to Rep.
-        if self.current_stage in self.reproductive_stages:
-            # In reproductive phase, stress hits yield directly
-            # We can also add a "Pollination Failure" penalty here if stress is extremely high during Flowering
-            self.reproductive_biomass_kg_ha += actual_biomass_gain_kg_ha
-        else:
-            self.vegetative_biomass_kg_ha += actual_biomass_gain_kg_ha
-
-        # Total is sum
-        self.total_biomass_kg_ha = self.vegetative_biomass_kg_ha + self.reproductive_biomass_kg_ha
+        # --- GDD accumulation and stage advance ---
+        # Stage must advance BEFORE biomass partitioning so that the day GDD
+        # crosses a threshold the correct (new) stage is used for partitioning
+        # and light-interception lookup.  GDD is driven by temperature only —
+        # stress never changes air temperature, so no stress scalar here.
+        self.accumulated_gdd += self._calculate_daily_gdd(t_min_c, t_max_c)
 
         new_stage_reached = self.current_stage
         for stage_name in self.stage_order:
@@ -186,16 +157,42 @@ class CropModel:
             )
             self.current_stage = new_stage_reached
 
-    def get_final_yield(self) -> float:
-        """Calculates final grain yield using harvest index (DSSAT/AquaCrop approach).
+        # --- Root Growth ---
+        # Roots grow during vegetative stages, stop at reproductive stages
+        if self.current_stage in self.vegetative_stages:
+            growth_today = self.daily_root_growth_rate_mm * overall_stress_factor
+            self.root_depth_mm = min(self.max_root_depth_mm, self.root_depth_mm + growth_today)
 
-        harvest_index partitions biomass into grain fraction.  Stress has
-        already been applied to daily biomass accumulation; applying HI here
-        does NOT double-count stress — it separates grain from total crop mass.
+        light_interception = self.light_interception_per_stage.get(
+            self.current_stage, 0.1
+        )
+        potential_biomass_gain_g_m2 = (
+            solar_rad_mj_m2 * self.rue_g_mj * light_interception
+        )
+        actual_biomass_gain_g_m2 = potential_biomass_gain_g_m2 * overall_stress_factor
+        actual_biomass_gain_kg_ha = actual_biomass_gain_g_m2 * 10  # g/m² → kg/ha
+
+        # --- Biomass Partitioning ---
+        # Before reproductive stages: all to vegetative pool.
+        # From VT onward: all to reproductive pool.
+        if self.current_stage in self.reproductive_stages:
+            self.reproductive_biomass_kg_ha += actual_biomass_gain_kg_ha
+        else:
+            self.vegetative_biomass_kg_ha += actual_biomass_gain_kg_ha
+
+        self.total_biomass_kg_ha = self.vegetative_biomass_kg_ha + self.reproductive_biomass_kg_ha
+
+    def get_final_yield(self) -> float:
+        """Calculates final grain yield using the harvest index.
+
+        HI is defined agronomically as: HI = grain_yield / total_aboveground_biomass
+        so: yield = total_biomass × HI.
+
+        Stress has already been applied daily to biomass accumulation; HI here
+        separates grain from total crop mass without double-counting stress.
+        The veg/repro pools are retained for internal tracking (LAI, stress
+        diagnostics) but are not the correct base for the HI calculation.
         """
-        if self.reproductive_biomass_kg_ha > 0:
-            return self.reproductive_biomass_kg_ha * self.harvest_index
-        # Crop never reached flowering — scale total biomass as fallback estimate
         return self.total_biomass_kg_ha * self.harvest_index
 
     def get_lai(self) -> float:
