@@ -28,6 +28,9 @@ class NutrientModel:
         self.temp_opt = temp_opt
         self.temp_max = temp_max
 
+        self.cumulative_N_uptake_kg_ha = 0.0
+        self._nni = 1.0
+
     def add_fertilizer(self, amount_N_kg_ha: float, fertilizer_type: str = "urea"):
         # ... (this method remains the same) ...
         if amount_N_kg_ha < 0:
@@ -78,7 +81,6 @@ class NutrientModel:
         )
 
     def _simulate_uptake(self, crop_N_demand_kg_ha: float) -> float:
-        # ... (this method remains the same) ...
         plant_available_N = self.nitrate_N_kg_ha + self.ammonium_N_kg_ha
         uptake_possible = min(plant_available_N, crop_N_demand_kg_ha)
         nitrate_uptake = min(self.nitrate_N_kg_ha, uptake_possible)
@@ -86,7 +88,9 @@ class NutrientModel:
         remaining_demand = uptake_possible - nitrate_uptake
         ammonium_uptake = min(self.ammonium_N_kg_ha, remaining_demand)
         self.ammonium_N_kg_ha -= ammonium_uptake
-        return nitrate_uptake + ammonium_uptake
+        actual_uptake = nitrate_uptake + ammonium_uptake
+        self.cumulative_N_uptake_kg_ha += actual_uptake
+        return actual_uptake
 
     def _simulate_leaching(
         self, deep_percolation_mm: float, soil_status: Dict[str, Any]
@@ -115,15 +119,36 @@ class NutrientModel:
         fraction_awc = soil_status.get("fraction_awc", 0.5)
 
         self._simulate_transformations(avg_temp_c, fraction_awc)
+
+        # Soil N mineralization (Griffin et al., Illinois silt loam)
+        # Field correction ~0.4 of lab potential rate (suboptimal moisture + aggregate protection)
+        Nmin_25C = 0.4  # kg N/ha/day at 25°C, 0-15cm
+        Q10 = 2.0
+        mineralization_today = Nmin_25C * (Q10 ** ((avg_temp_c - 25.0) / 10.0))
+        mineralization_today = max(0.0, min(2.0, mineralization_today))
+        self.nitrate_N_kg_ha += mineralization_today
+
         self._simulate_leaching(deep_percolation_mm, soil_model_instance)
         actual_uptake = self._simulate_uptake(crop_N_demand_kg_ha)
         return actual_uptake
 
+    def compute_NNI(self, biomass_Mg_ha: float, actual_N_kg_ha: float) -> float:
+        """Nitrogen Nutrition Index (Plénet & Lemaire / Djaman & Irmak 2018)."""
+        if biomass_Mg_ha <= 0:
+            return 1.0
+        # Critical N concentration (Plénet & Lemaire model)
+        Nc_g_per_kg = 34.0 * (biomass_Mg_ha ** -0.37)
+        Nc_kg_ha = Nc_g_per_kg * biomass_Mg_ha  # convert to kg N/ha
+        if Nc_kg_ha <= 0:
+            return 1.0
+        nni = actual_N_kg_ha / Nc_kg_ha
+        return min(1.5, max(0.0, nni))
+
     def get_status(self) -> dict:
-        # ... (this method remains the same) ...
         return {
             "urea_N_kg_ha": round(self.urea_N_kg_ha, 2),
             "ammonium_N_kg_ha": round(self.ammonium_N_kg_ha, 2),
             "nitrate_N_kg_ha": round(self.nitrate_N_kg_ha, 2),
             "available_N_kg_ha": round(self.ammonium_N_kg_ha + self.nitrate_N_kg_ha, 2),
+            "nitrogen_nutrition_index": round(self._nni, 3),
         }

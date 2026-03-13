@@ -487,7 +487,20 @@ class SimulationService:
                 
                 crop_n_demand_today = self.crop_model.get_daily_n_demand()
                 actual_n_uptake_today = self.nutrient_model.update_daily(crop_n_demand_today, deep_percolation_mm_today, avg_temp_numeric, soil_status_dict)
-                
+
+                # NNI-based nitrogen stress (Djaman & Irmak 2018)
+                biomass_Mg_ha = self.crop_model.total_biomass_kg_ha / 1000.0
+                nni = self.nutrient_model.compute_NNI(biomass_Mg_ha, self.nutrient_model.cumulative_N_uptake_kg_ha)
+                self.nutrient_model._nni = nni
+                # APSIM-style floored quadratic: gradual stress below NNI=1.0,
+                # floor at 0.10 so severely N-deficient crop still grows (subsoil N mining)
+                if nni >= 1.0:
+                    n_stress_nni = 1.0
+                elif nni >= 0.5:
+                    n_stress_nni = nni ** 2
+                else:
+                    n_stress_nni = max(0.1, nni ** 2)
+
                 # crop_status_before_update = self.crop_model.get_status() # Moved up
                 non_disease_stress = min(crop_status_before_update['nitrogen_stress_factor'], crop_status_before_update['water_stress_factor'])
 
@@ -516,7 +529,7 @@ class SimulationService:
                 }
                 disease_stress_factor = disease_status['disease_stress_factor']
 
-                self.crop_model.update_daily(min_temp_numeric, max_temp_numeric, solar_rad_today, actual_n_uptake_today, soil_status_dict, disease_stress_factor)
+                self.crop_model.update_daily(min_temp_numeric, max_temp_numeric, solar_rad_today, actual_n_uptake_today, soil_status_dict, disease_stress_factor, nitrogen_stress_override=n_stress_nni)
                 crop_status = self.crop_model.get_status()
                 nutrient_status = self.nutrient_model.get_status()
 

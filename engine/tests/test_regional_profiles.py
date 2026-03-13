@@ -30,15 +30,22 @@ def test_ks_maps_to_great_plains():
     )
 
 
-def test_gls_multiplier_higher_in_southeast_vs_corn_belt():
-    """GLS multiplier must be 1.5x higher in southeast (1.5) vs corn_belt (1.0)."""
+def test_gls_multiplier_values():
+    """
+    GLS multipliers match peer-reviewed calibration values.
+
+    Corn belt: 1.0 (baseline)
+    Southeast: 0.45 — peer-reviewed data show GLS is less prevalent in the
+    hot/dry southeast lowlands than in the humid Corn Belt.
+    """
     southeast_mult = get_disease_multiplier("GA", "gls")  # GA → southeast
     corn_belt_mult = get_disease_multiplier("OH", "gls")  # OH → corn_belt
-    assert southeast_mult > corn_belt_mult, (
-        f"Expected southeast GLS ({southeast_mult}) > corn_belt GLS ({corn_belt_mult})"
-    )
-    assert southeast_mult == 1.5, f"Expected 1.5 for southeast GLS, got {southeast_mult}"
+    assert southeast_mult == 0.45, f"Expected 0.45 for southeast GLS, got {southeast_mult}"
     assert corn_belt_mult == 1.0, f"Expected 1.0 for corn_belt GLS, got {corn_belt_mult}"
+    assert southeast_mult < corn_belt_mult, (
+        f"Expected southeast GLS ({southeast_mult}) < corn_belt GLS ({corn_belt_mult}) "
+        f"per peer-reviewed regional calibration."
+    )
 
 
 def test_unknown_state_falls_back_to_default():

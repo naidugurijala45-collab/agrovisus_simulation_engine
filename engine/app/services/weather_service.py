@@ -13,6 +13,7 @@ Usage:
     daily_data = weather_service.get_daily_weather(lat, lon, date)
 """
 
+import calendar
 import logging
 import os
 import json
@@ -47,6 +48,25 @@ _WEATHER_LIMITS = {
     "total_solar_rad_mj_m2": (0.0, 50.0),
 }
 
+
+# ── NOAA Illinois precipitation climatology (1991-2020 normals) ──────────────
+# Monthly totals (mm) for central Illinois.  Used to calibrate the synthetic
+# precipitation fallback so simulated rain matches real-world climate norms.
+_IL_MONTHLY_PRECIP_MM = {
+    1: 50.0, 2: 48.0, 3: 64.0, 4:  79.0, 5:  97.0, 6: 102.0,
+    7: 99.0, 8: 89.0, 9: 84.0, 10: 69.0, 11: 66.0, 12:  57.0,
+}
+
+# Fraction of days per month with measurable precipitation (wet-day probability).
+# spring/summer 0.35-0.40, winter 0.30-0.35.
+_IL_WET_DAY_PROB = {
+    1: 0.30, 2: 0.30, 3: 0.33, 4: 0.35, 5: 0.38, 6: 0.40,
+    7: 0.38, 8: 0.35, 9: 0.33, 10: 0.32, 11: 0.33, 12: 0.30,
+}
+
+# Growing-season months (May-Aug) where consecutive dry days are capped.
+_DRY_SPELL_CAP_MONTHS = frozenset({5, 6, 7, 8})
+_MAX_CONSECUTIVE_DRY_DAYS = 5
 
 # Backward-compatible aliases so existing imports still work
 class WeatherServiceError(_WeatherDataError):
@@ -96,6 +116,15 @@ class WeatherService:
 
         # In-memory cache for prefetched Open-Meteo range data (date -> dict)
         self._openmeteo_daily_cache: Dict[date, Dict] = {}
+
+        # Consecutive dry day counter — used by the synthetic precipitation model
+        # to enforce the Illinois growing-season dry-spell cap (≤5 days May-Aug).
+        self._consecutive_dry_days: int = 0
+
+        # Month-to-date precipitation tracker — used to prevent extreme monthly
+        # deficits by boosting wet-day probability when too far below NOAA normal.
+        self._synthetic_month: int = 0
+        self._synthetic_month_precip_mm: float = 0.0
 
         # Setup cache directory
         if self.cache_enabled:
@@ -735,15 +764,73 @@ class WeatherService:
         # Humidity: inversely related to temperature
         avg_humidity = max(30, min(95, 75 - (avg_temp - 15) * 0.8 + np.random.normal(0, 5)))
 
-        # Precipitation: stochastic with seasonal pattern
-        precip_prob = 0.2 + 0.1 * np.sin(2 * np.pi * (doy - 100) / 365)
-        precip = max(0, np.random.exponential(5)) if np.random.random() < precip_prob else 0.0
+        # Precipitation: calibrated to NOAA Illinois monthly normals.
+        # Uses a Gamma(shape=0.8) distribution on wet days — shape < 1 gives a
+        # realistic right-skewed distribution (many small events, occasional large).
+        # scale = monthly_total / wet_days_per_month per NOAA specification;
+        # E[amount per wet day] = shape × scale ≈ 80 % of monthly_normal (realistic).
+        month = target_date.month
+        days_in_month = calendar.monthrange(target_date.year, month)[1]
+        monthly_normal_mm = _IL_MONTHLY_PRECIP_MM.get(month, 75.0)
+        wet_day_prob = _IL_WET_DAY_PROB.get(month, 0.33)
+        wet_days_per_month = wet_day_prob * days_in_month
+        gamma_shape = 0.8
+        gamma_scale = monthly_normal_mm / max(1.0, wet_days_per_month)
+
+        # ── Monthly deficit correction (May-Aug only) ──────────────────────
+        # Reset tracker on a new month.
+        if month != self._synthetic_month:
+            self._synthetic_month = month
+            self._synthetic_month_precip_mm = 0.0
+
+        # If we are in a growing-season month and the month-to-date total is
+        # more than 35 % of the monthly normal BELOW the pro-rated expected
+        # amount, raise wet_day_prob by up to +0.15 so future days catch up.
+        effective_wet_day_prob = wet_day_prob
+        if month in _DRY_SPELL_CAP_MONTHS:
+            day_of_month = target_date.day
+            expected_so_far = monthly_normal_mm * (day_of_month / days_in_month)
+            deficit_mm = expected_so_far - self._synthetic_month_precip_mm
+            if deficit_mm > 0.35 * monthly_normal_mm:
+                # Scale the boost proportionally to how far behind we are,
+                # capped at +0.15 (never exceed 55 % wet-day probability).
+                boost = min(0.15, (deficit_mm - 0.35 * monthly_normal_mm) / monthly_normal_mm)
+                effective_wet_day_prob = min(0.55, wet_day_prob + boost)
+
+        # ── Dry-spell cap (May-Aug) ────────────────────────────────────────
+        # During May-Aug, enforce ≤5 consecutive dry days to prevent
+        # unrealistic month-long droughts in the Illinois growing season.
+        force_wet = (
+            month in _DRY_SPELL_CAP_MONTHS
+            and self._consecutive_dry_days >= _MAX_CONSECUTIVE_DRY_DAYS
+        )
+        is_wet = force_wet or (np.random.random() < effective_wet_day_prob)
+
+        if is_wet:
+            precip = float(np.random.gamma(shape=gamma_shape, scale=gamma_scale))
+            # When the dry-spell cap forces a rain event, ensure the amount is
+            # agronomically meaningful (≥50% of the average event depth).
+            # This prevents the pathological case where the cap fires but the
+            # gamma draw is tiny, leaving soil moisture critically low.
+            if force_wet:
+                min_forced_mm = gamma_shape * gamma_scale * 0.5
+                precip = max(precip, min_forced_mm)
+            self._consecutive_dry_days = 0
+        else:
+            precip = 0.0
+            self._consecutive_dry_days += 1
+
+        # Update month-to-date accumulator for the deficit correction above.
+        self._synthetic_month_precip_mm += precip
 
         # Wind speed: 1.5-4 m/s typical
         wind_speed = max(0.5, np.random.normal(2.5, 0.8))
 
-        # Solar radiation: depends on latitude, day-of-year, and cloud cover
-        solar_rad = self._estimate_solar_radiation(lat, target_date, avg_humidity)
+        # Solar radiation: coupled to precipitation status.
+        # On rainy days cloud cover raises effective humidity → reduces solar.
+        # This correctly represents: rain = cloud cover = less shortwave radiation.
+        solar_humidity = max(avg_humidity, 85.0) if is_wet else avg_humidity
+        solar_rad = self._estimate_solar_radiation(lat, target_date, solar_humidity)
 
         return {
             "total_precip_mm": round(precip, 2),
@@ -824,9 +911,14 @@ class WeatherService:
             np.cos(lat_rad) * np.cos(decl) * np.sin(ws)
         )
 
-        # Adjust for cloud cover (use humidity as proxy)
-        # Clear sky: ~75% of Ra, cloudy: ~25% of Ra
-        cloud_factor = 0.75 - 0.005 * max(0, humidity - 50)
-        cloud_factor = max(0.25, min(0.75, cloud_factor))
+        # Adjust for cloud cover using an Angstrom-Prescott calibration.
+        # The Angstrom equation: Rs = Ra × (a + b × n/N) where
+        #   a=0.25, b=0.50, n/N = fractional sunshine hours.
+        # Sunshine fraction correlates inversely with humidity.
+        # Calibrated for midlatitude humid continental climate (Illinois):
+        #   humidity 50 % (dry)  → cloud_factor ≈ 0.55 (22 MJ/m²/day)
+        #   humidity 70 % (normal) → cloud_factor ≈ 0.52 (21 MJ/m²/day)
+        #   humidity 85 % (rainy) → cloud_factor ≈ 0.45 (18 MJ/m²/day)
+        cloud_factor = max(0.25, min(0.55, 0.875 - 0.005 * humidity))
 
         return max(0, Ra * cloud_factor)

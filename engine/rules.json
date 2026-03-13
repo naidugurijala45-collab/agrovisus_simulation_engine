@@ -13,6 +13,8 @@
         "severity": "High",
         "alert_type": "Foliar Disease Risk",
         "yield_impact_percent": 15.0,
+        "temp_opt_c": 22,
+        "lwd_opt_hours": 12,
         "recommendation": "Conditions favour Northern Corn Leaf Blight. Scout for cigar-shaped lesions and apply foliar fungicide if >5% leaf area affected."
       }
     },
@@ -20,14 +22,17 @@
       "id": "GLS_Risk",
       "name": "Gray Leaf Spot Risk",
       "conditions": [
-        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 22.0 },
+        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 20.0 },
+        { "path": "weather.current_temp_c", "operator": "less_than",    "threshold": 32.0 },
         { "path": "weather.humidity_percent", "operator": "greater_than", "threshold": 90.0 },
-        { "path": "weather.leaf_wetness_hours", "operator": "greater_than", "threshold": 8.0 }
+        { "path": "weather.leaf_wetness_hours", "operator": "greater_than", "threshold": 12.0 }
       ],
       "result": {
         "severity": "High",
         "alert_type": "Foliar Disease Risk",
         "yield_impact_percent": 12.0,
+        "temp_opt_c": 27,
+        "lwd_opt_hours": 18,
         "recommendation": "High Gray Leaf Spot risk. Extended leaf wetness with warm nights — consider fungicide application at VT/R1."
       }
     },
@@ -35,14 +40,17 @@
       "id": "Common_Rust_Risk",
       "name": "Common Rust Risk",
       "conditions": [
-        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 15.0 },
+        { "path": "weather.current_temp_c", "operator": "greater_than", "threshold": 16.0 },
         { "path": "weather.current_temp_c", "operator": "less_than",    "threshold": 25.0 },
-        { "path": "weather.humidity_percent", "operator": "greater_than", "threshold": 80.0 }
+        { "path": "weather.humidity_percent", "operator": "greater_than", "threshold": 95.0 },
+        { "path": "weather.leaf_wetness_hours", "operator": "greater_than", "threshold": 6.0 }
       ],
       "result": {
         "severity": "Moderate",
         "alert_type": "Foliar Disease Risk",
         "yield_impact_percent": 8.0,
+        "temp_opt_c": 19,
+        "lwd_opt_hours": 12,
         "recommendation": "Conditions are suitable for Common Rust development. Scout for brick-red pustules on leaves and monitor closely through silking."
       }
     },

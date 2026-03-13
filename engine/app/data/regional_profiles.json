@@ -5,7 +5,7 @@
       "states": ["OH", "IN", "IL", "IA", "MO"],
       "yield_benchmark_bu_ac": 185,
       "disease_risk_multipliers": {
-        "nclb": 1.2,
+        "nclb": 1.0,
         "gls": 1.0,
         "common_rust": 0.9
       },
@@ -39,8 +39,8 @@
       "states": ["GA", "AL", "MS", "AR", "TN", "NC", "SC", "VA"],
       "yield_benchmark_bu_ac": 160,
       "disease_risk_multipliers": {
-        "nclb": 1.0,
-        "gls": 1.5,
+        "nclb": 0.4,
+        "gls": 0.45,
         "common_rust": 1.3
       },
       "soil_defaults": {
@@ -56,8 +56,8 @@
       "states": ["LA", "TX", "OK"],
       "yield_benchmark_bu_ac": 150,
       "disease_risk_multipliers": {
-        "nclb": 0.9,
-        "gls": 1.4,
+        "nclb": 0.4,
+        "gls": 0.45,
         "common_rust": 1.2
       },
       "soil_defaults": {
@@ -73,7 +73,7 @@
       "states": [],
       "yield_benchmark_bu_ac": 185,
       "disease_risk_multipliers": {
-        "nclb": 1.2,
+        "nclb": 1.0,
         "gls": 1.0,
         "common_rust": 0.9
       },

@@ -27,10 +27,10 @@ from app.services.weather_service import WeatherService
 AQUACROP_BENCHMARK_KG_HA = 8_992   # AquaCrop Illinois corn reference
 TARGET_LOW  = 6_000
 TARGET_HIGH = 8_000
-SIM_DAYS    = 120
+SIM_DAYS    = 150
 LAT         = 40.0
 LON         = -88.0
-START_DATE  = date(2024, 4, 15)     # canonical spring planting date
+START_DATE  = date(2024, 5, 1)      # canonical Illinois spring planting date
 
 # Management: typical Illinois corn — pre-plant + side-dress
 FERT_SCHEDULE = [
@@ -65,8 +65,8 @@ def make_model(seed):
             "VT": 1.0, "R1": 1.0, "R3": 0.9, "R6": 0.7,
         },
         "N_demand_kg_ha_per_stage": {
-            "VE": 0.3, "V2": 0.7, "V6": 2.0, "V10": 3.0,
-            "VT": 3.5, "R1": 2.5, "R3": 1.5, "R6": 0.5,
+            "VE": 0.3, "V6": 1.1, "VT": 5.0,
+            "R1": 2.7, "R2": 1.5, "R3": 1.5, "R4": 1.5, "R5": 1.0, "R6": 0.0,
         },
     })
 
@@ -117,6 +117,7 @@ def make_model(seed):
         mgmt.setdefault(ev["day"], []).append(ev)
 
     transitions = []
+    nni_at_stage = {}   # NNI recorded on first day at each stage
     prev_stage = crop.current_stage
 
     for d in range(SIM_DAYS):
@@ -132,10 +133,11 @@ def make_model(seed):
             if "amount_kg_ha" in ev:
                 nutrient.add_fertilizer(ev["amount_kg_ha"], ev.get("fert_type", "urea"))
 
+        # Illinois reference ET0: ~6.0 mm/day (NOAA Penman-Monteith July peak).
         soil.update_daily(
             precipitation_mm=wx["total_precip_mm"],
             irrigation_mm=irrig_mm,
-            et0_mm=4.0,
+            et0_mm=6.0,
             crop_coefficient_kc=0.8,
             root_depth_mm=crop.root_depth_mm,
         )
@@ -144,17 +146,32 @@ def make_model(seed):
         n_demand = crop.get_daily_n_demand()
         actual_n = nutrient.update_daily(n_demand, 0.0, wx["avg_temp_c"], soil_status)
 
+        # NNI-based nitrogen stress (Djaman & Irmak 2018)
+        biomass_Mg_ha = crop.total_biomass_kg_ha / 1000.0
+        nni = nutrient.compute_NNI(biomass_Mg_ha, nutrient.cumulative_N_uptake_kg_ha)
+        nutrient._nni = nni
+        # APSIM-style floored quadratic: gradual stress below NNI=1.0,
+        # floor at 0.10 so severely N-deficient crop still grows (subsoil N mining)
+        if nni >= 1.0:
+            n_stress_nni = 1.0
+        elif nni >= 0.5:
+            n_stress_nni = nni ** 2
+        else:
+            n_stress_nni = max(0.1, nni ** 2)
+
         crop.update_daily(
             wx["min_temp_c"], wx["max_temp_c"],
             wx["total_solar_rad_mj_m2"],
             actual_n, soil_status, 1.0,
+            nitrogen_stress_override=n_stress_nni,
         )
 
         if crop.current_stage != prev_stage:
             transitions.append((day_num, prev_stage, crop.current_stage, crop.accumulated_gdd))
+            nni_at_stage[crop.current_stage] = round(nni, 3)
             prev_stage = crop.current_stage
 
-    return crop, transitions
+    return crop, transitions, nni_at_stage
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -166,13 +183,17 @@ print("=" * 65)
 
 yields = []
 biomasses = []
+seed1_nni = {}
 
 for seed in range(N_RUNS):
-    crop, transitions = make_model(seed)
+    crop, transitions, nni_at_stage = make_model(seed)
     y = crop.get_final_yield()
     b = crop.total_biomass_kg_ha
     yields.append(y)
     biomasses.append(b)
+
+    if seed == 0:
+        seed1_nni = nni_at_stage
 
     repro_pct = (crop.reproductive_biomass_kg_ha / b * 100) if b else 0
     trans_str = "  ".join(f"{f}->{t}@d{d}" for d, f, t, _ in transitions)
@@ -191,6 +212,9 @@ print(f"  Average yield    : {avg_yield:>8,.0f} kg/ha")
 print(f"  Average biomass  : {avg_biomass:>8,.0f} kg/ha")
 print(f"  AquaCrop target  : {AQUACROP_BENCHMARK_KG_HA:>8,} kg/ha")
 print(f"  Difference       : {pct_vs_aquacrop:>+8.1f}%")
+print()
+print(f"  Seed 1 NNI  V6={seed1_nni.get('V6', 'N/A')}  VT={seed1_nni.get('VT', 'N/A')}"
+      f"  R1(≈R2)={seed1_nni.get('R1', 'N/A')}")
 print()
 if TARGET_LOW <= avg_yield <= TARGET_HIGH:
     print(f"  PASS  AgroVisus yield is within target range "

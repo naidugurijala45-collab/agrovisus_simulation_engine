@@ -57,13 +57,16 @@
             },
             "N_demand_kg_ha_per_stage": {
                 "VE": 0.3,
-                "V2": 0.7,
-                "V6": 2.0,
+                "V2": 0.6,
+                "V6": 1.1,
                 "V10": 3.0,
-                "VT": 3.5,
-                "R1": 2.5,
+                "VT": 5.0,
+                "R1": 2.7,
+                "R2": 1.5,
                 "R3": 1.5,
-                "R6": 0.5
+                "R4": 1.5,
+                "R5": 1.0,
+                "R6": 0.0
             },
             "kc_fallback": 0.70,
             "vegetative_stages": [
@@ -112,6 +115,7 @@
             "total_N_kg_ha": 180.0,
             "total_P_kg_ha": 80.0,
             "total_K_kg_ha": 100.0,
+            "total_seasonal_N_kg_ha": 269,
             "initial_nitrate_N_kg_ha": 40.0,
             "initial_ammonium_N_kg_ha": 10.0,
             "split_application": true,

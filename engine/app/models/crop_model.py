@@ -72,6 +72,11 @@ class CropModel:
         self.total_biomass_kg_ha = 0.0
         self.vegetative_biomass_kg_ha = 0.0
         self.reproductive_biomass_kg_ha = 0.0
+
+        # Stress-day counters for dynamic harvest index
+        self._veg_stress_days = 0
+        self._repro_stress_days = 0      # VT / R1 (pollination)
+        self._grainfill_stress_days = 0  # R3 (grain fill)
         
         self.root_depth_mm = 50.0
         self.max_root_depth_mm = float(max_root_depth_mm)
@@ -114,11 +119,15 @@ class CropModel:
         actual_n_uptake_kg_ha: float,
         soil_status: Dict[str, Any],
         disease_stress_factor: float = 1.0,
+        nitrogen_stress_override: Optional[float] = None,
     ):
         n_demand = self.get_daily_n_demand()
-        self.nitrogen_stress_factor = (
-            min(1.0, actual_n_uptake_kg_ha / n_demand) if n_demand > 0 else 1.0
-        )
+        if nitrogen_stress_override is not None:
+            self.nitrogen_stress_factor = max(0.0, min(1.0, nitrogen_stress_override))
+        else:
+            self.nitrogen_stress_factor = (
+                min(1.0, actual_n_uptake_kg_ha / n_demand) if n_demand > 0 else 1.0
+            )
 
         fraction_awc = soil_status.get("fraction_awc", 1.0)
         drought_stress_factor = (
@@ -157,6 +166,17 @@ class CropModel:
             )
             self.current_stage = new_stage_reached
 
+        # --- Stress-day counters for dynamic harvest index ---
+        # Threshold < 0.25: only count genuinely severe stress (near wilting point).
+        # Moderate deficit (0.25–0.50) does not significantly reduce HI per Djaman et al.
+        if self.water_stress_factor < 0.15:
+            if self.current_stage in self.vegetative_stages:
+                self._veg_stress_days += 1
+            elif self.current_stage in {"VT", "R1"}:
+                self._repro_stress_days += 1
+            elif self.current_stage == "R3":
+                self._grainfill_stress_days += 1
+
         # --- Root Growth ---
         # Roots grow during vegetative stages, stop at reproductive stages
         if self.current_stage in self.vegetative_stages:
@@ -183,17 +203,29 @@ class CropModel:
         self.total_biomass_kg_ha = self.vegetative_biomass_kg_ha + self.reproductive_biomass_kg_ha
 
     def get_final_yield(self) -> float:
-        """Calculates final grain yield using the harvest index.
+        """Calculates final grain yield using a dynamic harvest index.
 
-        HI is defined agronomically as: HI = grain_yield / total_aboveground_biomass
-        so: yield = total_biomass × HI.
+        Base HI = 0.54 (peer-reviewed Illinois corn average).
+        HI is reduced by severe water stress (water_stress_factor < 0.5) during:
+          - Pollination (VT/R1): up to -50% of HI reduction
+          - Grain fill  (R3):    up to -30% of HI reduction
+        HI floor = 0.30 (catastrophic stress).
 
         Stress has already been applied daily to biomass accumulation; HI here
         separates grain from total crop mass without double-counting stress.
-        The veg/repro pools are retained for internal tracking (LAI, stress
-        diagnostics) but are not the correct base for the HI calculation.
         """
-        return self.total_biomass_kg_ha * self.harvest_index
+        hi = 0.54
+        if self._repro_stress_days > 0:
+            # Max −35% for full pollination failure (≥20 severe-stress days at VT/R1).
+            # Djaman: rainfed HI ~0.49 vs irrigated ~0.57 → ~14% typical seasonal drop.
+            f_repro = min(1.0, self._repro_stress_days / 20.0)
+            hi = hi * (1 - 0.35 * f_repro)
+        if self._grainfill_stress_days > 0:
+            # Max −20% for full grain-fill failure (≥30 severe-stress days at R3).
+            f_fill = min(1.0, self._grainfill_stress_days / 30.0)
+            hi = hi * (1 - 0.20 * f_fill)
+        hi = max(0.42, hi)
+        return self.total_biomass_kg_ha * hi
 
     def get_lai(self) -> float:
         """
@@ -221,4 +253,6 @@ class CropModel:
             "nitrogen_stress_factor": round(self.nitrogen_stress_factor, 2),
             "water_stress_factor": round(self.water_stress_factor, 2),
             "n_demand_kg_ha_per_day": self.get_daily_n_demand(),
+            "repro_stress_days": self._repro_stress_days,
+            "grainfill_stress_days": self._grainfill_stress_days,
         }
