@@ -1,8 +1,7 @@
 import os
 import csv
 import logging
-import json
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 # Import models and services (adjusting paths for internal service usage)
@@ -11,17 +10,33 @@ from app.services.data_manager import DataManager
 from app.services.weather_service import WeatherService
 from app.services.reporting_service import ReportingService
 from app.services.et0_service import ET0Service
-from app.utils.leaf_wetness_model import calculate_leaf_wetness_duration
+from app.services.simulation_pipeline import SimulationPipeline, DayState
 from app.models.soil_model import SoilModel
 from app.models.crop_model import CropModel
 from app.models.nutrient_model import NutrientModel
 from app.models.disease_model import DiseaseModel
-from app.utils.validators import validate_config_value, validate_positive, validate_range
-from app.utils.exceptions import ConfigValidationError, ModelInitError, SimulationError
+from app.utils.validators import validate_config_value, validate_positive
+from app.utils.exceptions import ConfigValidationError, ModelInitError
 from app.utils.crop_template_loader import CropTemplateLoader
 from app.services.regional_profile_loader import (
     load_profile, get_disease_multiplier, get_soil_defaults, get_yield_benchmark,
 )
+
+_CSV_HEADERS = [
+    "date", "day_of_year",
+    "daily_avg_temp_c", "daily_min_temp_c", "daily_max_temp_c", "daily_precipitation_mm",
+    "daily_solar_radiation_mj_m2", "daily_avg_humidity_percent", "daily_et0_mm",
+    "gdd_accumulated", "crop_growth_stage", "total_biomass_kg_ha", "leaf_area_index",
+    "crop_nitrogen_demand_kg_ha",
+    "fraction_awc", "daily_etc_mm", "daily_percolation_mm", "daily_runoff_mm",
+    "daily_irrigation_mm", "daily_fertilization_kg_ha",
+    "soil_urea_kg_ha", "soil_ammonium_kg_ha", "soil_nitrate_kg_ha",
+    "crop_nitrogen_uptake_kg_ha", "nitrogen_daily_leaching_kg_ha",
+    "overall_stress_factor", "water_stress_factor", "nitrogen_stress_factor",
+    "disease_stress_factor", "disease_severity_percent",
+    "triggered_rules",
+]
+
 
 class SimulationService:
     def __init__(self, config_data: Dict[str, Any], project_root: str, state_code: Optional[str] = None):
@@ -146,6 +161,39 @@ class SimulationService:
             return file_path
         return os.path.join(self.project_root, file_path)
 
+    def _resolve_n_initial(self, key: str, full_template: Optional[dict], default: float) -> float:
+        """Resolve an initial soil-N value using the four-tier config priority chain.
+
+        Priority (highest → lowest):
+          1. nutrient_model_config in the passed config  — explicit programmatic override
+          2. crop template ``nutrients`` section          — canonical non-request source
+          3. regional profile ``soil_defaults``           — location-specific adjustment
+          4. ``default`` argument                        — hardcoded fallback
+        """
+        # Tier 1: explicit override (e.g. set programmatically or forwarded from request)
+        explicit = self.nutrient_config.get(key)
+        if explicit is not None:
+            self.logger.debug("N-init %s: tier-1 explicit = %s", key, explicit)
+            return float(explicit)
+
+        # Tier 2: crop template nutrients section
+        if full_template is not None:
+            tmpl_val = full_template.get("nutrients", {}).get(key)
+            if tmpl_val is not None:
+                self.logger.debug("N-init %s: tier-2 template = %s", key, tmpl_val)
+                return float(tmpl_val)
+
+        # Tier 3: regional profile soil defaults (reserved for future regional data)
+        if self.regional_profile is not None:
+            reg_val = self.regional_profile.get("soil_defaults", {}).get(key)
+            if reg_val is not None:
+                self.logger.debug("N-init %s: tier-3 regional = %s", key, reg_val)
+                return float(reg_val)
+
+        # Tier 4: hardcoded fallback
+        self.logger.debug("N-init %s: tier-4 fallback = %s", key, default)
+        return default
+
     def _resolve_crop_config(self):
         """
         Resolve crop config: if crop_template is set, load template and
@@ -179,6 +227,23 @@ class SimulationService:
             return dict(self.crop_config_conf), None
 
     def _initialize_models(self, state_code: Optional[str] = None):
+        """Instantiate all simulation models using a four-tier config priority chain.
+
+        Config resolution priority (highest → lowest):
+          1. Explicit request params   — values set in SimulationRequest / _build_config()
+          2. Regional profile          — get_soil_defaults(state_code) for FC/WP when not
+                                         overridden by the request
+          3. Crop template             — soil.* and growth.* from crop_templates.json when
+                                         the user selects a template (e.g. "corn")
+          4. config.json defaults      — baseline values from the root config file
+
+        Initial soil-N values (initial_nitrate_N_kg_ha, initial_ammonium_N_kg_ha) are
+        resolved via ``_resolve_n_initial()``, which enforces this same four-tier order:
+          1. nutrient_model_config key present in the passed config  (explicit override)
+          2. crop template's ``nutrients`` section                    (canonical source)
+          3. regional profile's ``soil_defaults``                     (location adjustment)
+          4. hardcoded fallback  (40 kg NO3-N/ha, 10 kg NH4-N/ha)
+        """
         try:
             # ── Regional profile ────────────────────────────────────────────
             if state_code:
@@ -283,10 +348,13 @@ class SimulationService:
                 custom_soil_params=custom_soil_params
             )
 
-            # Nutrient Model
+            # Nutrient Model — initial N resolved via priority chain (see _resolve_n_initial)
+            init_no3 = self._resolve_n_initial("initial_nitrate_N_kg_ha", full_template, 40.0)
+            init_nh4 = self._resolve_n_initial("initial_ammonium_N_kg_ha", full_template, 10.0)
+            self.logger.info("NutrientModel init: NO3=%.1f kg/ha, NH4=%.1f kg/ha", init_no3, init_nh4)
             self.nutrient_model = NutrientModel(
-                initial_nitrate_N_kg_ha=self._safe_float(self.nutrient_config.get("initial_nitrate_N_kg_ha"), 15.0), 
-                initial_ammonium_N_kg_ha=self._safe_float(self.nutrient_config.get("initial_ammonium_N_kg_ha"), 5.0), 
+                initial_nitrate_N_kg_ha=init_no3,
+                initial_ammonium_N_kg_ha=init_nh4,
                 max_daily_urea_hydrolysis_rate=self._safe_float(self.nutrient_config.get("max_daily_urea_hydrolysis_rate"), 0.30), 
                 max_daily_nitrification_rate=self._safe_float(self.nutrient_config.get("max_daily_nitrification_rate"), 0.15), 
                 temp_base=self._safe_float(self.nutrient_config.get("temp_base"), 5.0), 
@@ -350,227 +418,50 @@ class SimulationService:
     def run_simulation(self, start_date: date, sim_days: int, output_csv_path: str):
         latitude = self._safe_float(self.sim_settings_conf.get("latitude_degrees", 40.0))
         longitude = self._safe_float(self.sim_settings_conf.get("longitude_degrees", 0.0))
-        elevation = self._safe_float(self.sim_settings_conf.get("elevation_m", 100.0))
-        
-        sim_dates_to_process = [start_date + timedelta(days=i) for i in range(sim_days)]
-        actual_sim_days_count = len(sim_dates_to_process)
-        
-        self.logger.info(f"Simulation will run from {start_date} for {actual_sim_days_count} day(s).")
-        
-        # CSV Headers - matching old run.py
-        csv_headers = [
-            "date", "day_of_year",
-            "daily_avg_temp_c", "daily_min_temp_c", "daily_max_temp_c", "daily_precipitation_mm",
-            "daily_solar_radiation_mj_m2", "daily_avg_humidity_percent", "daily_et0_mm",
-            "gdd_accumulated", "crop_growth_stage", "total_biomass_kg_ha", "leaf_area_index", "crop_nitrogen_demand_kg_ha",
-            "fraction_awc", "daily_etc_mm", "daily_percolation_mm", "daily_runoff_mm",
-            "daily_irrigation_mm", "daily_fertilization_kg_ha",
-            "soil_urea_kg_ha", "soil_ammonium_kg_ha", "soil_nitrate_kg_ha", "crop_nitrogen_uptake_kg_ha", "nitrogen_daily_leaching_kg_ha",
-            "overall_stress_factor", "water_stress_factor", "nitrogen_stress_factor", "disease_stress_factor",
-            "disease_severity_percent",
-            "triggered_rules",
-        ]
-
-        all_triggered_rules_over_time = []
-        all_rows = []
-        csv_file = None
+        sim_dates = [start_date + timedelta(days=i) for i in range(sim_days)]
+        self.logger.info(f"Simulation will run from {start_date} for {len(sim_dates)} day(s).")
 
         # Prefetch entire date range from Open-Meteo in one API call so the
         # per-day loop hits the in-memory cache instead of making 150+ requests.
-        if sim_dates_to_process:
+        if sim_dates:
             self.weather_service.prefetch_date_range(
-                latitude, longitude,
-                sim_dates_to_process[0],
-                sim_dates_to_process[-1],
+                latitude, longitude, sim_dates[0], sim_dates[-1]
             )
 
+        pipeline = SimulationPipeline()
+        all_rows: List[Dict[str, Any]] = []
+        all_triggered: List[Dict[str, Any]] = []
+        csv_file = None
         try:
-            csv_file = open(output_csv_path, 'w', newline='', encoding='utf-8')
-            csv_writer = csv.DictWriter(csv_file, fieldnames=csv_headers)
+            csv_file = open(output_csv_path, "w", newline="", encoding="utf-8")
+            csv_writer = csv.DictWriter(csv_file, fieldnames=_CSV_HEADERS)
             csv_writer.writeheader()
             self.logger.info(f"CSV output file opened: {output_csv_path}")
 
-            for day_idx, current_simulation_date in enumerate(sim_dates_to_process):
-                sim_day_number = day_idx + 1
-                self.logger.info(f"--- Processing Day {sim_day_number}/{actual_sim_days_count}: {current_simulation_date.strftime('%Y-%m-%d')} ---")
-
-                # 1. Management
-                irrigation_today_mm = 0.0
-                daily_fertilization_events = []
-                if sim_day_number in self.management_events:
-                    for event in self.management_events[sim_day_number]:
-                        if event.get("type") == "irrigation":
-                            amount = self._safe_float(event.get("amount_mm"), 0.0)
-                            irrigation_today_mm += amount
-                            self.logger.info(f"MANAGEMENT EVENT: Applying {amount:.1f} mm irrigation.")
-                        elif event.get("type") == "fertilizer":
-                            amount_n = self._safe_float(event.get("amount_kg_ha"), 0.0)
-                            fert_type = event.get("fertilizer_type", "unknown")
-                            daily_fertilization_events.append({"amount_kg_ha": amount_n, "type": fert_type})
-                            self.logger.info(f"MANAGEMENT EVENT: Applying {amount_n:.1f} kg N/ha as {fert_type}.")
-                            self.nutrient_model.add_fertilizer(amount_n, fert_type)
-
-                # 2. Weather (WeatherService handles full fallback chain)
-                daily_aggregated_weather = self.weather_service.get_daily_weather(
-                    lat=latitude, lon=longitude,
-                    target_date=current_simulation_date
+            for day_idx, sim_date in enumerate(sim_dates):
+                self.logger.info(
+                    f"--- Processing Day {day_idx + 1}/{len(sim_dates)}:"
+                    f" {sim_date.strftime('%Y-%m-%d')} ---"
                 )
-
-                precipitation_today = daily_aggregated_weather.get('total_precip_mm', 0.0)
-                min_temp_numeric = daily_aggregated_weather.get('min_temp_c', 10.0)
-                max_temp_numeric = daily_aggregated_weather.get('max_temp_c', 20.0)
-                avg_temp_numeric = daily_aggregated_weather.get('avg_temp_c', 15.0)
-                avg_humidity_numeric = daily_aggregated_weather.get('avg_humidity', 70.0)
-                max_humidity_numeric = daily_aggregated_weather.get('max_humidity_percent', 85.0)
-                solar_rad_today = daily_aggregated_weather.get('total_solar_rad_mj_m2', 20.0)
-                wind_speed_today = daily_aggregated_weather.get('avg_wind_speed_m_s', 2.0)
-                
-                # Use ET0Service for calculation
-                et0_today = self.et0_service.calculate_et0(
-                    weather_data={
-                        "t_min": min_temp_numeric,
-                        "t_max": max_temp_numeric,
-                        "t_avg": avg_temp_numeric,
-                        "rh_avg": avg_humidity_numeric,
-                        "rs_mj_m2": solar_rad_today,
-                        "u2_m_s": wind_speed_today
-                    },
-                    location={
-                        "lat": latitude,
-                        "elevation_m": elevation
-                    },
-                    day_of_year=current_simulation_date
-                )
-
-                daily_weather = {
-                    'avg_temp_c': avg_temp_numeric,
-                    'min_temp_c': min_temp_numeric,
-                    'max_temp_c': max_temp_numeric,
-                    'precipitation_mm': precipitation_today,
-                    'solar_radiation_mj_m2': solar_rad_today,
-                    'avg_humidity_percent': avg_humidity_numeric,
-                    'et0_mm': et0_today
-                }
-
-                # 3. Update Models
-                # Single get_status() call — reuse dict for both kc and root_depth lookups
-                crop_status_before_update = self.crop_model.get_status()
-                current_crop_stage_before_update = crop_status_before_update["current_stage"]
-                kc_map = self.crop_config_conf.get("kc_per_stage", {})
-                kc_today = kc_map.get(current_crop_stage_before_update, self.crop_config_conf.get("kc_fallback", 0.7))
-                root_depth = crop_status_before_update.get('root_depth_mm', 50.0)
-                
-                soil_updates = self.soil_model.update_daily(
-                    precipitation_mm=precipitation_today,
-                    irrigation_mm=irrigation_today_mm,
-                    et0_mm=et0_today,
-                    crop_coefficient_kc=kc_today,
-                    root_depth_mm=root_depth # NEW
-                )
-                
-                deep_percolation_mm_today = soil_updates["deep_percolation_mm"]
-
-                # 3. Crop Model Update
-                # Note: We need 'effective' soil moisture for the plant.
-                # The SoilModel.get_soil_moisture_status() returns `fraction_awc` as total profile average,
-                # but technically plants only feel what's in the root zone.
-                # For Phase 2, we rely on the implementation detailed in SoilModel which might need refining
-                # to return 'root_zone_fraction_awc'.
-                # For now, we use the `fraction_awc` returned (Total Profile), which is a simplification,
-                # BUT since water extraction is layer-based, the "Total Profile" will heavily reflect where water was taken from.
-                
-                soil_status_dict = self.soil_model.get_soil_moisture_status()
-                
-                # Update Crop
-                # Get L1 moisture specifically for germination/seedling stress if needed?
-                # Currently crop model just takes 'fraction_awc'.
-                
-                crop_n_demand_today = self.crop_model.get_daily_n_demand()
-                actual_n_uptake_today = self.nutrient_model.update_daily(crop_n_demand_today, deep_percolation_mm_today, avg_temp_numeric, soil_status_dict)
-
-                # NNI-based nitrogen stress (Djaman & Irmak 2018)
-                biomass_Mg_ha = self.crop_model.total_biomass_kg_ha / 1000.0
-                nni = self.nutrient_model.compute_NNI(biomass_Mg_ha, self.nutrient_model.cumulative_N_uptake_kg_ha)
-                self.nutrient_model._nni = nni
-                # APSIM-style floored quadratic: gradual stress below NNI=1.0,
-                # floor at 0.10 so severely N-deficient crop still grows (subsoil N mining)
-                if nni >= 1.0:
-                    n_stress_nni = 1.0
-                elif nni >= 0.5:
-                    n_stress_nni = nni ** 2
-                else:
-                    n_stress_nni = max(0.1, nni ** 2)
-
-                # crop_status_before_update = self.crop_model.get_status() # Moved up
-                non_disease_stress = min(crop_status_before_update['nitrogen_stress_factor'], crop_status_before_update['water_stress_factor'])
-
-                # Disease Model
-                hourly_data_df = self.data_manager.get_hourly_data_for_simulation_day(current_simulation_date)
-                hourly_weather_list = hourly_data_df.to_dict('records') if hourly_data_df is not None else []
-                calculated_lwd_hours = calculate_leaf_wetness_duration(hourly_weather_list) if hourly_weather_list else 0.0
-
-                disease_weather_input = {'avg_temp_c': avg_temp_numeric}
-                for dm in self.disease_models:
-                    dm.update_daily(
-                        daily_weather=disease_weather_input,
-                        hourly_weather=hourly_weather_list,
-                        crop_growth_stage=crop_status_before_update['current_stage'],
-                        crop_lai=crop_status_before_update.get('lai', 0.0),
-                        crop_non_disease_stress_factor=non_disease_stress
+                state = DayState(sim_date=sim_date, day_num=day_idx + 1)
+                pipeline.run_day(state, self)
+                all_rows.append(state.daily_report)
+                if state.triggered_rule_dicts:
+                    all_triggered.append(
+                        {"date": sim_date.strftime("%Y-%m-%d"), "rules": state.triggered_rule_dicts}
                     )
-                # Aggregate: worst-case severity and stress across all diseases
-                all_states = [dm.get_current_state() for dm in self.disease_models]
-                worst = max(all_states, key=lambda s: s['disease_severity'])
-                disease_status = {
-                    'disease_severity': worst['disease_severity'],
-                    'disease_severity_percent': worst['disease_severity'] * 100,
-                    'latent_infections': worst['latent_infections'],
-                    'disease_stress_factor': min(s['disease_stress_factor'] for s in all_states),
-                }
-                disease_stress_factor = disease_status['disease_stress_factor']
-
-                self.crop_model.update_daily(min_temp_numeric, max_temp_numeric, solar_rad_today, actual_n_uptake_today, soil_status_dict, disease_stress_factor, nitrogen_stress_override=n_stress_nni)
-                crop_status = self.crop_model.get_status()
-                nutrient_status = self.nutrient_model.get_status()
-
-                self.logger.info(f"  Crop Status: Stage='{crop_status['current_stage']}', GDD={crop_status['accumulated_gdd']:.1f}, Root={crop_status.get('root_depth_mm',0):.0f}mm, Veg/Rep Bio={crop_status.get('vegetative_biomass_kg_ha',0):.1f}/{crop_status.get('reproductive_biomass_kg_ha',0):.1f}, N-Stress={crop_status['nitrogen_stress_factor']:.2f}, H2O-Stress={crop_status['water_stress_factor']:.2f}")
-                self.logger.info(f"  Disease Status: Severity={disease_status['disease_severity']:.4f}, Stress Factor={disease_stress_factor:.2f}")
-                self.logger.info(f"  Nutrient Status: Available N={nutrient_status['available_N_kg_ha']:.2f} kg/ha (Urea: {nutrient_status['urea_N_kg_ha']:.2f}, NH4: {nutrient_status['ammonium_N_kg_ha']:.2f}, NO3: {nutrient_status['nitrate_N_kg_ha']:.2f})")
-                self.logger.info(f"  Soil: Total AWC={soil_status_dict['fraction_awc']:.2f} | L1(0-15cm): {soil_status_dict.get('L1_frac_awc',0):.2f} | L2(15-60cm): {soil_status_dict.get('L2_frac_awc',0):.2f} | DP={deep_percolation_mm_today:.1f}mm")
-
-                # 4. Rules
-                input_data_for_rules = {"weather": {"humidity_percent": float(avg_humidity_numeric), "current_temp_c": float(avg_temp_numeric), "leaf_wetness_hours": calculated_lwd_hours}, "soil": {**soil_status_dict}, "crop": {**crop_status}, "nutrients": {**nutrient_status}, "disease": {**disease_status}}
-                triggered_rules_today = self.rule_evaluator.evaluate_rules(input_data_for_rules)
-                triggered_rules_list = [r['rule_id'] for r in triggered_rules_today] if triggered_rules_today else []
-                
-                if triggered_rules_today:
-                    for rule in triggered_rules_today:
-                        self.logger.info(f"--- >>> Rule {rule.get('rule_id')} ('{rule.get('name')}') TRIGGERED <<< ---")
-                    all_triggered_rules_over_time.append({"date": current_simulation_date.strftime('%Y-%m-%d'), "rules": triggered_rules_today})
-
-                # 5. Reporting
-                daily_report_data = self.reporting_service.get_daily_report_data(
-                    current_date=current_simulation_date,
-                    daily_weather=daily_weather,
-                    daily_irrigation_mm=irrigation_today_mm,
-                    daily_fertilization_events=daily_fertilization_events,
-                    triggered_rules_for_day=triggered_rules_list
-                )
-                all_rows.append(daily_report_data)
 
             csv_writer.writerows(all_rows)
             self.logger.info("\n--- SIMULATION COMPLETE ---")
             final_yield = self.crop_model.get_final_yield()
             self.logger.info(f"Total Biomass Accumulated: {self.crop_model.total_biomass_kg_ha:.2f} kg/ha")
             self.logger.info(f"Predicted Final Grain Yield: {final_yield:.2f} kg/ha")
-
             return {
                 "total_biomass_kg_ha": self.crop_model.total_biomass_kg_ha,
                 "final_yield_kg_ha": final_yield,
-                "triggered_rules": all_triggered_rules_over_time,
+                "triggered_rules": all_triggered,
                 "regional_yield_benchmark_bu_ac": self.regional_yield_benchmark_bu_ac,
             }
-
         finally:
             if csv_file:
                 csv_file.close()

@@ -72,8 +72,6 @@
     }
   },
   "nutrient_model_config": {
-    "initial_nitrate_N_kg_ha": 40.0,
-    "initial_ammonium_N_kg_ha": 10.0,
     "max_daily_urea_hydrolysis_rate": 0.35,
     "max_daily_nitrification_rate": 0.2,
     "temp_base": 2.0,

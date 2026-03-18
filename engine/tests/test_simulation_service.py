@@ -1,4 +1,5 @@
 import unittest
+import copy
 import os
 import shutil
 import tempfile
@@ -106,6 +107,49 @@ class TestSimulationService(unittest.TestCase):
         # Verify result dict
         self.assertIn("final_yield_kg_ha", result)
         self.assertIn("total_biomass_kg_ha", result)
+
+    def test_n_initial_explicit_override(self):
+        """Tier-1 explicit value in nutrient_model_config overrides the crop template.
+
+        The corn template sets initial_nitrate_N_kg_ha=40.0 and
+        initial_ammonium_N_kg_ha=10.0.  Setting 99 in nutrient_model_config must
+        win, proving that request params beat all other sources.
+        """
+        cfg = copy.deepcopy(self.config)
+        # Use the corn template so tier-2 would supply 40 / 10 if tier-1 were absent.
+        cfg["crop_model_config"]["crop_template"] = "corn"
+        # Tier-1 explicit override
+        cfg["nutrient_model_config"]["initial_nitrate_N_kg_ha"] = 99.0
+        cfg["nutrient_model_config"]["initial_ammonium_N_kg_ha"] = 99.0
+
+        service = SimulationService(cfg, self.project_root)
+
+        self.assertEqual(
+            service.nutrient_model.nitrate_N_kg_ha, 99.0,
+            "Tier-1 initial_nitrate_N_kg_ha=99 must override corn template value of 40.0",
+        )
+        self.assertEqual(
+            service.nutrient_model.ammonium_N_kg_ha, 99.0,
+            "Tier-1 initial_ammonium_N_kg_ha=99 must override corn template value of 10.0",
+        )
+
+    def test_n_initial_from_template(self):
+        """Tier-2: corn template value (40 / 10) is used when no explicit override is set."""
+        cfg = copy.deepcopy(self.config)
+        cfg["crop_model_config"]["crop_template"] = "corn"
+        # nutrient_model_config has no initial N keys → resolver falls to tier-2
+
+        service = SimulationService(cfg, self.project_root)
+
+        self.assertEqual(
+            service.nutrient_model.nitrate_N_kg_ha, 40.0,
+            "Corn template initial_nitrate_N_kg_ha=40.0 should be used when no override",
+        )
+        self.assertEqual(
+            service.nutrient_model.ammonium_N_kg_ha, 10.0,
+            "Corn template initial_ammonium_N_kg_ha=10.0 should be used when no override",
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
