@@ -15,7 +15,7 @@ ENGINE_ROOT = PROJECT_ROOT / "engine"
 sys.path.insert(0, str(ENGINE_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))  # Needed for 'from backend...' to work on Render
 
-from backend.routers import simulation, disease, crops
+from backend.routers import simulation, disease, crops, chat
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,6 +41,7 @@ app.add_middleware(
 app.include_router(simulation.router, prefix="/api/simulation", tags=["Simulation"])
 app.include_router(disease.router, prefix="/api/disease", tags=["Disease"])
 app.include_router(crops.router, prefix="/api/crops", tags=["Crops"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 
 @app.get("/api/health")
