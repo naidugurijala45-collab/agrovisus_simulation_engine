@@ -22,7 +22,7 @@
             "t_upper_c": 30.0,
             "total_gdd_to_maturity": 1700,
             "radiation_use_efficiency_g_mj": 3.5,
-            "harvest_index": 0.50,
+            "harvest_index": 0.5,
             "max_root_depth_mm": 1200.0,
             "daily_root_growth_rate_mm": 15.0,
             "gdd_thresholds": {
@@ -43,17 +43,17 @@
                 "VT": 1.15,
                 "R1": 1.15,
                 "R3": 0.95,
-                "R6": 0.50
+                "R6": 0.5
             },
             "light_interception_per_stage": {
-                "VE": 0.10,
-                "V2": 0.30,
-                "V6": 0.70,
+                "VE": 0.1,
+                "V2": 0.3,
+                "V6": 0.7,
                 "V10": 0.95,
-                "VT": 1.00,
-                "R1": 1.00,
-                "R3": 0.90,
-                "R6": 0.70
+                "VT": 1.0,
+                "R1": 1.0,
+                "R3": 0.9,
+                "R6": 0.7
             },
             "N_demand_kg_ha_per_stage": {
                 "VE": 0.3,
@@ -68,7 +68,7 @@
                 "R5": 1.0,
                 "R6": 0.0
             },
-            "kc_fallback": 0.70,
+            "kc_fallback": 0.7,
             "vegetative_stages": [
                 "VE",
                 "V2",
@@ -95,11 +95,11 @@
             },
             "organic_matter_min_percent": 2.0,
             "drainage": "well_drained",
-            "notes": "Prefers deep, well-drained silt loam or loam. Avoid poorly drained soils — corn is highly sensitive to waterlogging at VE-V6."
+            "notes": "Prefers deep, well-drained silt loam or loam. Avoid poorly drained soils \u00e2\u20ac\u201d corn is highly sensitive to waterlogging at VE-V6."
         },
         "irrigation": {
             "strategy": "threshold",
-            "trigger_awc_fraction": 0.40,
+            "trigger_awc_fraction": 0.4,
             "amount_mm_per_event": 25.0,
             "max_seasonal_mm": 500.0,
             "critical_stages": [
@@ -107,7 +107,7 @@
                 "R1",
                 "R3"
             ],
-            "critical_stage_trigger_awc": 0.50,
+            "critical_stage_trigger_awc": 0.5,
             "method": "furrow_or_sprinkler",
             "notes": "Most water-sensitive at silking (R1). A single day of severe stress at R1 can cut yield by 8-10%."
         },
@@ -164,7 +164,7 @@
                     "R3": 0.6,
                     "R6": 0.2
                 },
-                "yield_loss_per_severity_percent": 0.30,
+                "yield_loss_per_severity_percent": 0.3,
                 "management": {
                     "fungicide": "Headline (pyraclostrobin) or Quilt Xcel",
                     "application_timing": "Before VT if >5% leaf area infected",
@@ -224,7 +224,7 @@
                     "R3": 0.5,
                     "R6": 0.1
                 },
-                "yield_loss_per_severity_percent": 0.20,
+                "yield_loss_per_severity_percent": 0.2,
                 "management": {
                     "fungicide": "Tilt (propiconazole) or Headline",
                     "application_timing": "When pustules first appear before tasseling",
@@ -254,7 +254,21 @@
                 "temp_threshold_c": 10.0,
                 "management": "Bt transgenic varieties or chlorpyrifos at whorl stage."
             }
-        ]
+        ],
+        "rue": {
+            "vegetative": 3.8,
+            "grain_fill": 3.8,
+            "grain_fill_stage": "R1",
+            "basis": "APAR",
+            "k_extinction": 0.45,
+            "source": "Lindquist et al. 2005, Agron J 97:72-78",
+            "stress": {
+                "water_moderate": 0.85,
+                "water_severe": 0.6,
+                "n_moderate": 0.8,
+                "n_severe": 0.65
+            }
+        }
     },
     "wheat": {
         "crop_name": "Winter Wheat",
@@ -266,7 +280,7 @@
             "t_upper_c": 25.0,
             "total_gdd_to_maturity": 2200,
             "radiation_use_efficiency_g_mj": 2.8,
-            "harvest_index": 0.40,
+            "harvest_index": 0.4,
             "max_root_depth_mm": 1500.0,
             "daily_root_growth_rate_mm": 12.0,
             "gdd_thresholds": {
@@ -280,24 +294,24 @@
                 "Maturation": 2200
             },
             "kc_per_stage": {
-                "Emergence": 0.30,
-                "Tillering": 0.40,
+                "Emergence": 0.3,
+                "Tillering": 0.4,
                 "Jointing": 0.75,
-                "Booting": 1.00,
+                "Booting": 1.0,
                 "Heading": 1.15,
                 "Flowering": 1.15,
-                "GrainFilling": 0.80,
-                "Maturation": 0.40
+                "GrainFilling": 0.8,
+                "Maturation": 0.4
             },
             "light_interception_per_stage": {
-                "Emergence": 0.10,
+                "Emergence": 0.1,
                 "Tillering": 0.35,
-                "Jointing": 0.70,
-                "Booting": 0.90,
+                "Jointing": 0.7,
+                "Booting": 0.9,
                 "Heading": 0.95,
                 "Flowering": 0.95,
                 "GrainFilling": 0.85,
-                "Maturation": 0.60
+                "Maturation": 0.6
             },
             "N_demand_kg_ha_per_stage": {
                 "Emergence": 0.2,
@@ -405,7 +419,7 @@
                     "GrainFilling": 0.4,
                     "Maturation": 0.1
                 },
-                "yield_loss_per_severity_percent": 0.40,
+                "yield_loss_per_severity_percent": 0.4,
                 "management": {
                     "fungicide": "Tilt (propiconazole) or Folicur (tebuconazole)",
                     "application_timing": "At first sign of infection, before Heading",
@@ -435,7 +449,7 @@
                     "GrainFilling": 0.5,
                     "Maturation": 0.1
                 },
-                "yield_loss_per_severity_percent": 0.30,
+                "yield_loss_per_severity_percent": 0.3,
                 "management": {
                     "fungicide": "Caramba (metconazole) or Prosaro",
                     "application_timing": "Flag leaf stage if >10% leaf area infected",
@@ -453,7 +467,7 @@
                 "humidity_threshold_percent": 90.0,
                 "min_leaf_wetness_hours": 6.0,
                 "latent_period_days": 3,
-                "max_severity_rate": 0.10,
+                "max_severity_rate": 0.1,
                 "initial_inoculum": 0.002,
                 "susceptibility_by_stage": {
                     "Emergence": 0.0,
@@ -465,10 +479,10 @@
                     "GrainFilling": 0.7,
                     "Maturation": 0.2
                 },
-                "yield_loss_per_severity_percent": 0.50,
+                "yield_loss_per_severity_percent": 0.5,
                 "management": {
                     "fungicide": "Prosaro (prothioconazole + tebuconazole)",
-                    "application_timing": "At 50% heading — timing is critical within 4-day window",
+                    "application_timing": "At 50% heading \u00e2\u20ac\u201d timing is critical within 4-day window",
                     "preventive_window_days": 4
                 }
             }
@@ -484,7 +498,21 @@
                 "temp_threshold_c": 5.0,
                 "management": "Delay planting past fly-free date. Use resistant varieties."
             }
-        ]
+        ],
+        "rue": {
+            "vegetative": 1.6,
+            "grain_fill": 1.6,
+            "grain_fill_stage": "Flowering",
+            "basis": "APAR",
+            "k_extinction": 0.45,
+            "source": "Fang et al. 2022 Front PlantSci; Kemanian et al. 2004",
+            "stress": {
+                "water_moderate": 0.85,
+                "water_severe": 0.6,
+                "n_moderate": 0.8,
+                "n_severe": 0.65
+            }
+        }
     },
     "rice": {
         "crop_name": "Rice (Paddy)",
@@ -511,20 +539,20 @@
             },
             "kc_per_stage": {
                 "Emergence": 1.05,
-                "Seedling": 1.10,
+                "Seedling": 1.1,
                 "Tillering": 1.15,
-                "StemElongation": 1.20,
-                "Booting": 1.20,
+                "StemElongation": 1.2,
+                "Booting": 1.2,
                 "Flowering": 1.15,
                 "GrainFilling": 1.05,
-                "Maturation": 0.90
+                "Maturation": 0.9
             },
             "light_interception_per_stage": {
-                "Emergence": 0.10,
+                "Emergence": 0.1,
                 "Seedling": 0.25,
                 "Tillering": 0.55,
-                "StemElongation": 0.80,
-                "Booting": 0.90,
+                "StemElongation": 0.8,
+                "Booting": 0.9,
                 "Flowering": 0.95,
                 "GrainFilling": 0.85,
                 "Maturation": 0.65
@@ -539,7 +567,7 @@
                 "GrainFilling": 1.2,
                 "Maturation": 0.3
             },
-            "kc_fallback": 1.10,
+            "kc_fallback": 1.1,
             "vegetative_stages": [
                 "Emergence",
                 "Seedling",
@@ -557,7 +585,7 @@
             "preferred_type": "Clay",
             "field_capacity_mm": 160.0,
             "wilting_point_mm": 90.0,
-            "saturation_volumetric": 0.50,
+            "saturation_volumetric": 0.5,
             "assumed_root_zone_depth_mm": 400.0,
             "ph_range": {
                 "min": 5.5,
@@ -571,7 +599,7 @@
         },
         "irrigation": {
             "strategy": "flooded",
-            "trigger_awc_fraction": 0.90,
+            "trigger_awc_fraction": 0.9,
             "amount_mm_per_event": 50.0,
             "max_seasonal_mm": 1200.0,
             "critical_stages": [
@@ -636,7 +664,7 @@
                     "GrainFilling": 0.5,
                     "Maturation": 0.1
                 },
-                "yield_loss_per_severity_percent": 0.60,
+                "yield_loss_per_severity_percent": 0.6,
                 "management": {
                     "fungicide": "Tricyclazole or Isoprothiolane",
                     "application_timing": "At first lesion appearance, repeat at Booting",
@@ -655,7 +683,7 @@
                 "min_leaf_wetness_hours": 10.0,
                 "latent_period_days": 3,
                 "max_severity_rate": 0.08,
-                "initial_inoculum": 0.010,
+                "initial_inoculum": 0.01,
                 "susceptibility_by_stage": {
                     "Emergence": 0.1,
                     "Seedling": 0.2,
@@ -666,7 +694,7 @@
                     "GrainFilling": 0.8,
                     "Maturation": 0.3
                 },
-                "yield_loss_per_severity_percent": 0.40,
+                "yield_loss_per_severity_percent": 0.4,
                 "management": {
                     "fungicide": "Validamycin or Hexaconazole",
                     "application_timing": "At maximum tillering if lesions visible on lower sheaths",
@@ -698,7 +726,7 @@
                 },
                 "yield_loss_per_severity_percent": 0.35,
                 "management": {
-                    "fungicide": "Copper-based bactericides — limited chemical control. Use resistant varieties.",
+                    "fungicide": "Copper-based bactericides \u00e2\u20ac\u201d limited chemical control. Use resistant varieties.",
                     "application_timing": "Preventive only. No curative treatment available.",
                     "preventive_window_days": 0
                 }
@@ -715,7 +743,21 @@
                 "temp_threshold_c": 20.0,
                 "management": "Imidacloprid seed treatment or buprofezin spray. Avoid excessive N."
             }
-        ]
+        ],
+        "rue": {
+            "vegetative": 1.2,
+            "grain_fill": 4.5,
+            "grain_fill_stage": "Booting",
+            "basis": "APAR",
+            "k_extinction": 0.45,
+            "source": "Kato et al. 2010 Field Crops Res; Bouman et al. 2001 (PI-to-maturity 3.91-5.21)",
+            "stress": {
+                "water_moderate": 0.85,
+                "water_severe": 0.6,
+                "n_moderate": 0.8,
+                "n_severe": 0.65
+            }
+        }
     },
     "soybean": {
         "crop_name": "Soybean",
@@ -741,24 +783,24 @@
                 "R8": 1500
             },
             "kc_per_stage": {
-                "VE": 0.30,
-                "V2": 0.40,
+                "VE": 0.3,
+                "V2": 0.4,
                 "V6": 0.75,
-                "R1": 1.10,
+                "R1": 1.1,
                 "R3": 1.15,
-                "R5": 1.10,
-                "R7": 0.70,
-                "R8": 0.40
+                "R5": 1.1,
+                "R7": 0.7,
+                "R8": 0.4
             },
             "light_interception_per_stage": {
                 "VE": 0.08,
                 "V2": 0.25,
                 "V6": 0.65,
-                "R1": 0.90,
+                "R1": 0.9,
                 "R3": 0.95,
-                "R5": 0.90,
-                "R7": 0.70,
-                "R8": 0.50
+                "R5": 0.9,
+                "R7": 0.7,
+                "R8": 0.5
             },
             "N_demand_kg_ha_per_stage": {
                 "VE": 0.1,
@@ -770,7 +812,7 @@
                 "R7": 0.8,
                 "R8": 0.2
             },
-            "kc_fallback": 0.70,
+            "kc_fallback": 0.7,
             "vegetative_stages": [
                 "VE",
                 "V2",
@@ -799,11 +841,11 @@
             },
             "organic_matter_min_percent": 2.0,
             "drainage": "well_drained",
-            "notes": "Well-drained loam. pH critical for nitrogen fixation — below 6.0 severely reduces nodulation. Avoid compacted soils."
+            "notes": "Well-drained loam. pH critical for nitrogen fixation \u00e2\u20ac\u201d below 6.0 severely reduces nodulation. Avoid compacted soils."
         },
         "irrigation": {
             "strategy": "threshold",
-            "trigger_awc_fraction": 0.50,
+            "trigger_awc_fraction": 0.5,
             "amount_mm_per_event": 25.0,
             "max_seasonal_mm": 400.0,
             "critical_stages": [
@@ -830,7 +872,7 @@
                     "day": 5
                 }
             ],
-            "notes": "Low N application — soybean fixes atmospheric N via Rhizobium symbiosis. Apply Rhizobium inoculant at planting."
+            "notes": "Low N application \u00e2\u20ac\u201d soybean fixes atmospheric N via Rhizobium symbiosis. Apply Rhizobium inoculant at planting."
         },
         "diseases": [
             {
@@ -844,7 +886,7 @@
                 "humidity_threshold_percent": 75.0,
                 "min_leaf_wetness_hours": 6.0,
                 "latent_period_days": 5,
-                "max_severity_rate": 0.10,
+                "max_severity_rate": 0.1,
                 "initial_inoculum": 0.002,
                 "susceptibility_by_stage": {
                     "VE": 0.1,
@@ -856,10 +898,10 @@
                     "R7": 0.6,
                     "R8": 0.2
                 },
-                "yield_loss_per_severity_percent": 0.70,
+                "yield_loss_per_severity_percent": 0.7,
                 "management": {
                     "fungicide": "Headline (pyraclostrobin) or Opera (pyraclostrobin + epoxiconazole)",
-                    "application_timing": "Preventive — apply at R1 before symptoms appear in high-risk areas",
+                    "application_timing": "Preventive \u00e2\u20ac\u201d apply at R1 before symptoms appear in high-risk areas",
                     "preventive_window_days": 7
                 }
             },
@@ -936,7 +978,73 @@
                 "temp_threshold_c": 12.0,
                 "management": "Threshold: 250 aphids/plant. Dimethoate or lambda-cyhalothrin."
             }
-        ]
+        ],
+        "rue": {
+            "vegetative": 2.5,
+            "grain_fill": 2.5,
+            "grain_fill_stage": "R5",
+            "basis": "APAR",
+            "k_extinction": 0.45,
+            "source": "Purcell & Van Roekel 2019 (solar-basis 1.3-1.7 rescaled to APAR x0.5)",
+            "stress": {
+                "water_moderate": 0.85,
+                "water_severe": 0.6,
+                "n_moderate": 0.8,
+                "n_severe": 0.65
+            }
+        },
+        "bnf": {
+            "enabled": true,
+            "nmax_fixpot": 0.03,
+            "bnf_season_opt_kg_ha": 130,
+            "bnf_daily_peak_kg_ha": 2.5,
+            "source": "Ma et al. 2022 GMD doi:10.5194/gmd-15-815-2022; Salvagiotti et al. 2008 FCR doi:10.1016/j.fcr.2008.03.001; Ciampitti et al. 2021",
+            "temperature_response": {
+                "t_min": 5,
+                "t_opt_low": 20,
+                "t_opt_high": 35,
+                "t_max": 44
+            },
+            "water_response": {
+                "wf_lower": 0.2,
+                "wf_upper": 0.8,
+                "flooded_threshold_wfps": 0.9
+            },
+            "stage_response": {
+                "nds_min": 0.1,
+                "nds_opt_low": 0.3,
+                "nds_opt_high": 0.7,
+                "nds_max": 0.9,
+                "stage_multipliers": {
+                    "VE": 0.0,
+                    "V2": 0.1,
+                    "V6": 0.4,
+                    "R1": 0.8,
+                    "R3": 1.0,
+                    "R5": 1.0,
+                    "R7": 0.5,
+                    "R8": 0.0
+                }
+            },
+            "mineral_n_inhibition": {
+                "k_no3_mM": 3.0,
+                "no3_kg_ha_thresholds": {
+                    "low": 50,
+                    "moderate": 100,
+                    "high": 150
+                },
+                "inhibition_fractions": {
+                    "low": 0.9,
+                    "moderate": 0.55,
+                    "high": 0.2
+                }
+            },
+            "c_cost_g_per_g_n": 6.0,
+            "n_demand_fraction": {
+                "low_nitrate": 0.65,
+                "high_nitrate": 0.4
+            }
+        }
     },
     "sorghum": {
         "crop_name": "Grain Sorghum",
@@ -962,24 +1070,24 @@
                 "Maturation": 1900
             },
             "kc_per_stage": {
-                "Emergence": 0.30,
-                "ThreeLeaf": 0.40,
-                "FiveLeaf": 0.70,
+                "Emergence": 0.3,
+                "ThreeLeaf": 0.4,
+                "FiveLeaf": 0.7,
                 "FlagLeaf": 0.95,
-                "Boot": 1.10,
-                "Flowering": 1.10,
+                "Boot": 1.1,
+                "Flowering": 1.1,
                 "GrainFilling": 0.85,
                 "Maturation": 0.45
             },
             "light_interception_per_stage": {
-                "Emergence": 0.10,
-                "ThreeLeaf": 0.30,
+                "Emergence": 0.1,
+                "ThreeLeaf": 0.3,
                 "FiveLeaf": 0.65,
                 "FlagLeaf": 0.85,
                 "Boot": 0.95,
                 "Flowering": 0.95,
                 "GrainFilling": 0.85,
-                "Maturation": 0.60
+                "Maturation": 0.6
             },
             "N_demand_kg_ha_per_stage": {
                 "Emergence": 0.2,
@@ -1018,7 +1126,7 @@
             },
             "organic_matter_min_percent": 1.0,
             "drainage": "moderate",
-            "notes": "Highly drought tolerant — deep root system accesses subsoil water. Tolerates heavier soils and moderate salinity better than corn or wheat. Good for semi-arid regions."
+            "notes": "Highly drought tolerant \u00e2\u20ac\u201d deep root system accesses subsoil water. Tolerates heavier soils and moderate salinity better than corn or wheat. Good for semi-arid regions."
         },
         "irrigation": {
             "strategy": "threshold",
@@ -1086,7 +1194,7 @@
                     "GrainFilling": 0.7,
                     "Maturation": 0.3
                 },
-                "yield_loss_per_severity_percent": 0.30,
+                "yield_loss_per_severity_percent": 0.3,
                 "management": {
                     "fungicide": "Headline (pyraclostrobin) or Tilt (propiconazole)",
                     "application_timing": "At flag leaf if lesions visible and wet weather forecast",
@@ -1116,10 +1224,10 @@
                     "GrainFilling": 0.1,
                     "Maturation": 0.0
                 },
-                "yield_loss_per_severity_percent": 0.50,
+                "yield_loss_per_severity_percent": 0.5,
                 "management": {
                     "fungicide": "Metalaxyl seed treatment is most effective",
-                    "application_timing": "Seed treatment before planting — soil infection at emergence",
+                    "application_timing": "Seed treatment before planting \u00e2\u20ac\u201d soil infection at emergence",
                     "preventive_window_days": 0
                 }
             },
@@ -1164,6 +1272,20 @@
                 "temp_threshold_c": 18.0,
                 "management": "Uniform early planting to escape peak midge flight. Lambda-cyhalothrin at 50% heading."
             }
-        ]
+        ],
+        "rue": {
+            "vegetative": 3.2,
+            "grain_fill": 3.2,
+            "grain_fill_stage": "Boot",
+            "basis": "IPAR",
+            "k_extinction": 0.45,
+            "source": "Narayanan et al. 2013, Agron J 105:649-656",
+            "stress": {
+                "water_moderate": 0.85,
+                "water_severe": 0.6,
+                "n_moderate": 0.8,
+                "n_severe": 0.65
+            }
+        }
     }
 }

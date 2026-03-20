@@ -1,6 +1,7 @@
 # AGROVISUS_SIMULATION_ENGINE/app/models/crop_model.py
 
 import logging
+import math
 from typing import Any, Dict, List, Optional, Set
 
 from app.utils.exceptions import ConfigValidationError
@@ -26,6 +27,7 @@ class CropModel:
         daily_root_growth_rate_mm: float = 15.0,
         vegetative_stages: Optional[List[str]] = None,
         reproductive_stages: Optional[List[str]] = None,
+        rue_config: Optional[Dict[str, Any]] = None,
     ):
         # ── Validate inputs ─────────────────────────────────
         if not gdd_thresholds:
@@ -95,6 +97,32 @@ class CropModel:
             # Fallback: stages named Flowering, GrainFilling, Maturation
             self.reproductive_stages = {"Flowering", "GrainFilling", "Maturation"}
 
+        # ── RUE (Beer-Lambert) params ───────────────────────────────────────
+        _default_stress = {
+            "water_moderate": 0.85, "water_severe": 0.60,
+            "n_moderate": 0.80, "n_severe": 0.65,
+        }
+        self._has_rue_config = rue_config is not None
+        if rue_config:
+            self.rue_veg         = float(rue_config["vegetative"])
+            self.rue_grain_fill  = float(rue_config["grain_fill"])
+            self.k_ext           = float(rue_config.get("k_extinction", 0.45))
+            self.rue_stress      = rue_config.get("stress", _default_stress)
+            self.grain_fill_stage: Optional[str] = rue_config.get("grain_fill_stage")
+        else:
+            # Legacy fallback: single RUE value, no stage split
+            self.rue_veg         = float(radiation_use_efficiency_g_mj)
+            self.rue_grain_fill  = float(radiation_use_efficiency_g_mj)
+            self.k_ext           = 0.45
+            self.rue_stress      = _default_stress
+            self.grain_fill_stage = None
+
+        # Last-day RUE diagnostic outputs (populated by update_daily)
+        self._last_rue_base      = self.rue_veg
+        self._last_rue_effective = self.rue_veg
+        self._last_apar_daily    = 0.0
+        self._last_delta_biomass = 0.0
+
     def _calculate_daily_gdd(
         self, t_min_c: Optional[float], t_max_c: Optional[float]
     ) -> float:
@@ -108,6 +136,47 @@ class CropModel:
         avg_temp_for_gdd = (t_max_adj + t_min_adj) / 2.0
         return max(0.0, avg_temp_for_gdd - self.t_base_c)
 
+    def _stage_gte(self, current: str, target: str) -> bool:
+        """Return True if *current* is at or after *target* in stage_order."""
+        if target not in self.stage_order or current not in self.stage_order:
+            return False
+        return self.stage_order.index(current) >= self.stage_order.index(target)
+
+    def _compute_apar(self, solar_radiation_mj: float, lai: float) -> float:
+        """Absorbed PAR via Beer-Lambert: APAR = I₀ · k · (1 − e^{−k · LAI})"""
+        return solar_radiation_mj * self.k_ext * (1.0 - math.exp(-self.k_ext * lai))
+
+    def _compute_rue_effective(
+        self,
+        stage: str,
+        soil_water_factor: float,
+        nni: float,
+    ):
+        """Return (rue_effective, rue_base) with water and N stress applied."""
+        rue_base = (
+            self.rue_grain_fill
+            if (self.grain_fill_stage and self._stage_gte(stage, self.grain_fill_stage))
+            else self.rue_veg
+        )
+
+        # Water stress multiplier (piecewise, based on fraction_awc)
+        if soil_water_factor >= 0.7:
+            w_factor = 1.0
+        elif soil_water_factor >= 0.5:
+            w_factor = self.rue_stress["water_moderate"]
+        else:
+            w_factor = self.rue_stress["water_severe"]
+
+        # N stress multiplier (NNI-based)
+        if nni >= 0.9:
+            n_factor = 1.0
+        elif nni >= 0.7:
+            n_factor = self.rue_stress["n_moderate"]
+        else:
+            n_factor = self.rue_stress["n_severe"]
+
+        return rue_base * w_factor * n_factor, rue_base
+
     def get_daily_n_demand(self) -> float:
         return self.n_demand_per_stage.get(self.current_stage, 0.2)
 
@@ -120,6 +189,7 @@ class CropModel:
         soil_status: Dict[str, Any],
         disease_stress_factor: float = 1.0,
         nitrogen_stress_override: Optional[float] = None,
+        nni: float = 1.0,
     ):
         n_demand = self.get_daily_n_demand()
         if nitrogen_stress_override is not None:
@@ -183,14 +253,41 @@ class CropModel:
             growth_today = self.daily_root_growth_rate_mm * overall_stress_factor
             self.root_depth_mm = min(self.max_root_depth_mm, self.root_depth_mm + growth_today)
 
-        light_interception = self.light_interception_per_stage.get(
-            self.current_stage, 0.1
-        )
-        potential_biomass_gain_g_m2 = (
-            solar_rad_mj_m2 * self.rue_g_mj * light_interception
-        )
-        actual_biomass_gain_g_m2 = potential_biomass_gain_g_m2 * overall_stress_factor
-        actual_biomass_gain_kg_ha = actual_biomass_gain_g_m2 * 10  # g/m² → kg/ha
+        # ── Biomass accumulation ─────────────────────────────────────────────
+        fraction_awc = soil_status.get("fraction_awc", 1.0)
+        if self._has_rue_config:
+            # Beer-Lambert RUE path.
+            # Use tabulated light-interception as a minimum-LAI floor so the
+            # canopy can bootstrap from zero initial biomass.  The inverse of
+            # APAR_factor = k*(1-exp(-k*LAI)) gives LAI_floor when APAR_factor
+            # equals the tabulated fraction (clamped below k so ln stays valid).
+            li_stage = self.light_interception_per_stage.get(self.current_stage, 0.1)
+            li_clamp  = min(li_stage, self.k_ext * 0.999)
+            lai_floor = -math.log(1.0 - li_clamp / self.k_ext) / self.k_ext
+            lai = max(self.get_lai(), lai_floor)
+            apar = self._compute_apar(solar_rad_mj_m2, lai)
+            rue_effective, rue_base = self._compute_rue_effective(
+                self.current_stage, fraction_awc, nni
+            )
+            delta_biomass_g_m2 = rue_effective * apar * disease_stress_factor
+        else:
+            # Legacy path: solar × RUE × tabulated light-interception
+            light_interception = self.light_interception_per_stage.get(
+                self.current_stage, 0.1
+            )
+            potential_g_m2 = solar_rad_mj_m2 * self.rue_g_mj * light_interception
+            delta_biomass_g_m2 = potential_g_m2 * overall_stress_factor
+            rue_base      = self.rue_g_mj
+            rue_effective = self.rue_g_mj * overall_stress_factor
+            apar          = solar_rad_mj_m2 * light_interception
+
+        actual_biomass_gain_kg_ha = delta_biomass_g_m2 * 10  # g/m² → kg/ha
+
+        # Store for get_status() / ReportingService
+        self._last_rue_base      = rue_base
+        self._last_rue_effective = rue_effective
+        self._last_apar_daily    = apar
+        self._last_delta_biomass = delta_biomass_g_m2
 
         # --- Biomass Partitioning ---
         # Before reproductive stages: all to vegetative pool.
@@ -255,4 +352,9 @@ class CropModel:
             "n_demand_kg_ha_per_day": self.get_daily_n_demand(),
             "repro_stress_days": self._repro_stress_days,
             "grainfill_stress_days": self._grainfill_stress_days,
+            # RUE daily diagnostics
+            "rue_base": round(self._last_rue_base, 4),
+            "rue_effective": round(self._last_rue_effective, 4),
+            "apar_daily": round(self._last_apar_daily, 4),
+            "delta_biomass": round(self._last_delta_biomass, 4),
         }

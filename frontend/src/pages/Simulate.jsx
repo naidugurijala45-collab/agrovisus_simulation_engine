@@ -29,6 +29,10 @@ const DEFAULT_FORM = {
     commodity_price_usd_bu: '',
     state_code: '',
     formatted_address: '',
+    initial_growth_stage: 'V8',
+    soil_nitrogen_ppm: 25,
+    soil_moisture_level: 'normal',
+    recent_rain_event: false,
 };
 
 const CHART_STYLE = {
@@ -51,6 +55,8 @@ const ROI_STRENGTH_COLOR = {
     'Marginal': { text: 'var(--amber-400)', bg: 'var(--amber-glow)', border: 'rgba(251,191,36,0.25)' },
     'Monitor Only': { text: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)', border: 'var(--border)' },
 };
+
+const SOIL_MOISTURE_MAP = { dry: 0.4, normal: 0.85, wet: 0.95 };
 
 function fmt$(n) { return `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
 function fmtDec(n, d = 1) { return Number(n).toFixed(d); }
@@ -294,8 +300,13 @@ export default function Simulate() {
     }, []);
 
     const handleChange = (e) => {
-        const { name, value, type } = e.target;
-        setForm((f) => ({ ...f, [name]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value }));
+        const { name, value, type, checked } = e.target;
+        setForm((f) => ({
+            ...f,
+            [name]: type === 'checkbox' ? checked
+                  : type === 'number'   ? (value === '' ? '' : parseFloat(value))
+                  : value,
+        }));
     };
 
     const handleLocationChange = (lat, lng, meta = {}) => {
@@ -318,6 +329,9 @@ export default function Simulate() {
                 field_acres: parseFloat(form.field_acres) || 100,
                 treatment_cost_per_acre: parseFloat(form.treatment_cost_per_acre) || 25,
                 commodity_price_usd_bu: form.commodity_price_usd_bu !== '' ? parseFloat(form.commodity_price_usd_bu) : null,
+                soil_nitrogen_ppm: parseFloat(form.soil_nitrogen_ppm) || 25,
+                soil_water_factor: SOIL_MOISTURE_MAP[form.soil_moisture_level] ?? 0.85,
+                recent_rain_event: Boolean(form.recent_rain_event),
             };
             const data = await runSimulation(payload, { signal: abortControllerRef.current.signal });
             setResult(data);
@@ -331,6 +345,25 @@ export default function Simulate() {
     };
 
     const handleCancel = () => abortControllerRef.current?.abort();
+
+    const handleLoadDemo = () => {
+        setForm(f => ({
+            ...f,
+            crop_template:        'corn',
+            initial_growth_stage: 'V8',
+            latitude:             40.0,
+            longitude:            -89.0,
+            soil_nitrogen_ppm:    12,
+            soil_moisture_level:  'dry',
+            recent_rain_event:    true,
+            field_acres:          100,
+            treatment_cost_per_acre: 25,
+            commodity_price_usd_bu:  4.5,
+            sim_days:             120,
+        }));
+        setFertEvents([{ id: 1, day: 7, amount: 80, fertType: 'urea' }]);
+        setIrrigEvents([]);
+    };
 
     const handleExportPDF = async () => {
         if (!reportRef.current) return;
@@ -378,6 +411,20 @@ export default function Simulate() {
 
             {/* Config Form */}
             <div className="card mb-4">
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                    <button
+                        type="button"
+                        onClick={handleLoadDemo}
+                        style={{
+                            padding: '7px 16px', fontSize: '0.8rem', fontWeight: 600,
+                            background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.4)',
+                            color: '#fbbf24', borderRadius: 8, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                        }}
+                    >
+                        Load Demo Scenario 🌽
+                    </button>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 16 }}>
                     <div className="form-group">
                         <label className="form-label">Crop Template</label>
@@ -406,6 +453,142 @@ export default function Simulate() {
                                             onChange={handleLocationChange}
                                             resolved={{ formatted_address: form.formatted_address, state_code: form.state_code }}
                                         />
+                    </div>
+                </div>
+
+                {/* ── Current Growth Stage ─────────────────────────────── */}
+                <div style={{ marginBottom: 20 }}>
+                    <div style={{
+                        fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                        color: 'var(--text-muted)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                        <span>Current Growth Stage</span>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                    </div>
+                    <div style={{ maxWidth: 280 }}>
+                        <label className="form-label">Growth Stage</label>
+                        <select
+                            className="form-select"
+                            name="initial_growth_stage"
+                            value={form.initial_growth_stage}
+                            onChange={handleChange}
+                        >
+                            <optgroup label="Vegetative">
+                                {['VE','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12'].map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Reproductive">
+                                {[
+                                    ['R1', 'R1 (Silking)'],
+                                    ['R2', 'R2 (Blister)'],
+                                    ['R3', 'R3 (Milk)'],
+                                    ['R4', 'R4 (Dough)'],
+                                    ['R5', 'R5 (Dent)'],
+                                    ['R6', 'R6 (Maturity)'],
+                                ].map(([val, lbl]) => (
+                                    <option key={val} value={val}>{lbl}</option>
+                                ))}
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                {/* ── Soil Conditions ──────────────────────────────────── */}
+                <div style={{ marginBottom: 20 }}>
+                    <div style={{
+                        fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                        color: 'var(--text-muted)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                        <span>Soil Conditions</span>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
+                        {/* Soil Nitrogen */}
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Soil Nitrogen (ppm)</label>
+                            <input
+                                className="form-input"
+                                type="number"
+                                name="soil_nitrogen_ppm"
+                                value={form.soil_nitrogen_ppm}
+                                onChange={handleChange}
+                                min={0} max={300}
+                            />
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+                                Typical range: 10–40 ppm. Below 15 ppm = deficient
+                            </span>
+                        </div>
+
+                        {/* Soil Moisture — segmented control */}
+                        <div style={{ margin: 0 }}>
+                            <label className="form-label">Soil Moisture</label>
+                            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                {[
+                                    { level: 'dry',    label: 'Dry (stressed)' },
+                                    { level: 'normal', label: 'Normal' },
+                                    { level: 'wet',    label: 'Wet (excess)' },
+                                ].map(({ level, label }) => {
+                                    const active = form.soil_moisture_level === level;
+                                    return (
+                                        <button
+                                            key={level}
+                                            type="button"
+                                            onClick={() => setForm(f => ({ ...f, soil_moisture_level: level }))}
+                                            style={{
+                                                flex: 1,
+                                                padding: '8px 4px',
+                                                border: active ? '1px solid var(--green-400)' : '1px solid var(--border)',
+                                                borderRadius: 6,
+                                                background: active ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.02)',
+                                                color: active ? 'var(--green-400)' : 'var(--text-muted)',
+                                                fontSize: '0.75rem',
+                                                fontWeight: active ? 700 : 400,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s',
+                                            }}
+                                        >
+                                            {label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Recent Heavy Rain — toggle */}
+                    <div style={{ marginTop: 16 }}>
+                        <div
+                            onClick={() => setForm(f => ({ ...f, recent_rain_event: !f.recent_rain_event }))}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', width: 'fit-content' }}
+                        >
+                            <div style={{
+                                width: 38, height: 22, borderRadius: 11, position: 'relative', flexShrink: 0,
+                                background: form.recent_rain_event ? 'var(--green-400)' : 'var(--border)',
+                                transition: 'background 0.2s',
+                            }}>
+                                <div style={{
+                                    position: 'absolute', top: 3,
+                                    left: form.recent_rain_event ? 19 : 3,
+                                    width: 16, height: 16, borderRadius: '50%', background: 'white',
+                                    transition: 'left 0.2s',
+                                }} />
+                            </div>
+                            <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', userSelect: 'none' }}>
+                                Heavy rain in last 3 days (&gt;1.5 inches)
+                            </span>
+                        </div>
+                        {form.recent_rain_event && (
+                            <div style={{
+                                marginTop: 8, fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600,
+                                display: 'flex', alignItems: 'center', gap: 6,
+                            }}>
+                                ⚠ N leaching risk elevated
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -86,6 +86,13 @@ class ReportingService:
             # Disease Model Data
             "disease_severity_percent": self.disease_model.disease_severity,
             # Add other disease specific outputs like infection_potential if you want
+            # RUE daily diagnostics
+            "rue_base": self.crop_model._last_rue_base,
+            "rue_effective": self.crop_model._last_rue_effective,
+            "apar_daily": self.crop_model._last_apar_daily,
+            "delta_biomass": self.crop_model._last_delta_biomass,
+            # BNF daily diagnostics
+            "bnf_today_kg_ha": self.nutrient_model._last_bnf_kg_ha,
             # Rule Evaluator Data
             "triggered_rules": ", ".join(triggered_rules_for_day)
             if triggered_rules_for_day

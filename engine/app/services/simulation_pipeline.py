@@ -221,11 +221,24 @@ class NutrientStep(_Step):
 
     def run(self, state: DayState, svc: "SimulationService") -> None:
         state.crop_n_demand = svc.crop_model.get_daily_n_demand()
+
+        # ── BNF inputs ───────────────────────────────────────────────────────
+        # NDS: normalised development stage = accumulated_gdd / max_gdd_at_maturity
+        gdd_thresholds = svc.crop_model.gdd_thresholds
+        max_gdd = max(gdd_thresholds.values()) if gdd_thresholds else 1500.0
+        nds = min(1.0, svc.crop_model.accumulated_gdd / max_gdd) if max_gdd > 0 else 0.0
+        # Root DM proxy: ~15% of total biomass, converting kg/ha → g/m² (÷10 × 0.15 = ×0.015)
+        root_dm_g_m2 = max(5.0, svc.crop_model.total_biomass_kg_ha * 0.015)
+
         state.actual_n_uptake = svc.nutrient_model.update_daily(
             state.crop_n_demand,
             state.deep_percolation_mm,
             state.avg_temp_c,
             state.soil_status,
+            root_dm_g_m2=root_dm_g_m2,
+            soil_temp_25cm=state.avg_temp_c,   # surface air T as soil-T proxy
+            nds=nds,
+            wfps=None,                          # WFPS not currently tracked in SoilModel
         )
 
         biomass_Mg_ha = svc.crop_model.total_biomass_kg_ha / 1000.0
@@ -297,6 +310,7 @@ class CropStep(_Step):
             state.soil_status,
             state.disease_stress,
             nitrogen_stress_override=state.n_stress,
+            nni=state.nni,
         )
         state.crop_status = svc.crop_model.get_status()
         state.nutrient_status = svc.nutrient_model.get_status()

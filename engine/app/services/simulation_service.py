@@ -34,6 +34,8 @@ _CSV_HEADERS = [
     "crop_nitrogen_uptake_kg_ha", "nitrogen_daily_leaching_kg_ha",
     "overall_stress_factor", "water_stress_factor", "nitrogen_stress_factor",
     "disease_stress_factor", "disease_severity_percent",
+    "rue_base", "rue_effective", "apar_daily", "delta_biomass",
+    "bnf_today_kg_ha",
     "triggered_rules",
 ]
 
@@ -273,21 +275,23 @@ class SimulationService:
 
             # Crop Model — resolve template + overrides
             resolved_crop_config, full_template = self._resolve_crop_config()
+            rue_config = full_template.get("rue") if full_template else None
             self.crop_model = CropModel(
-                initial_stage=resolved_crop_config.get("initial_stage"), 
-                gdd_thresholds=resolved_crop_config.get("gdd_thresholds"), 
-                t_base_c=self._safe_float(resolved_crop_config.get("t_base_c")), 
-                t_upper_c=self._safe_float(resolved_crop_config.get("t_upper_c")), 
-                n_demand_per_stage=resolved_crop_config.get("N_demand_kg_ha_per_stage"), 
-                water_stress_threshold_awc=self._safe_float(resolved_crop_config.get("water_stress_threshold_awc")), 
-                anaerobic_stress_threshold_awc=self._safe_float(resolved_crop_config.get("anaerobic_stress_threshold_awc")), 
-                radiation_use_efficiency_g_mj=self._safe_float(resolved_crop_config.get("radiation_use_efficiency_g_mj")), 
-                light_interception_per_stage=resolved_crop_config.get("light_interception_per_stage"), 
+                initial_stage=resolved_crop_config.get("initial_stage"),
+                gdd_thresholds=resolved_crop_config.get("gdd_thresholds"),
+                t_base_c=self._safe_float(resolved_crop_config.get("t_base_c")),
+                t_upper_c=self._safe_float(resolved_crop_config.get("t_upper_c")),
+                n_demand_per_stage=resolved_crop_config.get("N_demand_kg_ha_per_stage"),
+                water_stress_threshold_awc=self._safe_float(resolved_crop_config.get("water_stress_threshold_awc")),
+                anaerobic_stress_threshold_awc=self._safe_float(resolved_crop_config.get("anaerobic_stress_threshold_awc")),
+                radiation_use_efficiency_g_mj=self._safe_float(resolved_crop_config.get("radiation_use_efficiency_g_mj")),
+                light_interception_per_stage=resolved_crop_config.get("light_interception_per_stage"),
                 harvest_index=self._safe_float(resolved_crop_config.get("harvest_index")),
                 max_root_depth_mm=self._safe_float(resolved_crop_config.get("max_root_depth_mm"), 1200.0),
                 daily_root_growth_rate_mm=self._safe_float(resolved_crop_config.get("daily_root_growth_rate_mm"), 15.0),
                 vegetative_stages=resolved_crop_config.get("vegetative_stages"),
                 reproductive_stages=resolved_crop_config.get("reproductive_stages"),
+                rue_config=rue_config,
             )
 
             # Soil Model — priority: explicit user config > template defaults > regional defaults
@@ -351,15 +355,19 @@ class SimulationService:
             # Nutrient Model — initial N resolved via priority chain (see _resolve_n_initial)
             init_no3 = self._resolve_n_initial("initial_nitrate_N_kg_ha", full_template, 40.0)
             init_nh4 = self._resolve_n_initial("initial_ammonium_N_kg_ha", full_template, 10.0)
+            bnf_config = full_template.get("bnf") if full_template else None
             self.logger.info("NutrientModel init: NO3=%.1f kg/ha, NH4=%.1f kg/ha", init_no3, init_nh4)
+            if bnf_config and bnf_config.get("enabled"):
+                self.logger.info("BNF enabled for this crop (soybean).")
             self.nutrient_model = NutrientModel(
                 initial_nitrate_N_kg_ha=init_no3,
                 initial_ammonium_N_kg_ha=init_nh4,
-                max_daily_urea_hydrolysis_rate=self._safe_float(self.nutrient_config.get("max_daily_urea_hydrolysis_rate"), 0.30), 
-                max_daily_nitrification_rate=self._safe_float(self.nutrient_config.get("max_daily_nitrification_rate"), 0.15), 
-                temp_base=self._safe_float(self.nutrient_config.get("temp_base"), 5.0), 
-                temp_opt=self._safe_float(self.nutrient_config.get("temp_opt"), 25.0), 
-                temp_max=self._safe_float(self.nutrient_config.get("temp_max"), 40.0)
+                max_daily_urea_hydrolysis_rate=self._safe_float(self.nutrient_config.get("max_daily_urea_hydrolysis_rate"), 0.30),
+                max_daily_nitrification_rate=self._safe_float(self.nutrient_config.get("max_daily_nitrification_rate"), 0.15),
+                temp_base=self._safe_float(self.nutrient_config.get("temp_base"), 5.0),
+                temp_opt=self._safe_float(self.nutrient_config.get("temp_opt"), 25.0),
+                temp_max=self._safe_float(self.nutrient_config.get("temp_max"), 40.0),
+                bnf_config=bnf_config,
             )
 
             # Disease Models — one per disease in the template
@@ -417,7 +425,7 @@ class SimulationService:
 
     def run_simulation(self, start_date: date, sim_days: int, output_csv_path: str):
         latitude = self._safe_float(self.sim_settings_conf.get("latitude_degrees", 40.0))
-        longitude = self._safe_float(self.sim_settings_conf.get("longitude_degrees", 0.0))
+        longitude = self._safe_float(self.sim_settings_conf.get("longitude_degrees", -89.0))
         sim_dates = [start_date + timedelta(days=i) for i in range(sim_days)]
         self.logger.info(f"Simulation will run from {start_date} for {len(sim_dates)} day(s).")
 
@@ -456,11 +464,31 @@ class SimulationService:
             final_yield = self.crop_model.get_final_yield()
             self.logger.info(f"Total Biomass Accumulated: {self.crop_model.total_biomass_kg_ha:.2f} kg/ha")
             self.logger.info(f"Predicted Final Grain Yield: {final_yield:.2f} kg/ha")
+
+            # Weather source breakdown: dates in the prefetch cache used historical
+            # Open-Meteo data; all others fell through to synthetic (or CSV).
+            historical_days = sum(
+                1 for d in sim_dates
+                if d in self.weather_service._openmeteo_daily_cache
+            )
+            synthetic_days = len(sim_dates) - historical_days
+
             return {
                 "total_biomass_kg_ha": self.crop_model.total_biomass_kg_ha,
                 "final_yield_kg_ha": final_yield,
                 "triggered_rules": all_triggered,
                 "regional_yield_benchmark_bu_ac": self.regional_yield_benchmark_bu_ac,
+                "weather_source": {
+                    "provider": "Open-Meteo (archive-api.open-meteo.com)",
+                    "type": "historical + synthetic fallback",
+                    "historical_days": historical_days,
+                    "synthetic_days": synthetic_days,
+                    "location": {"lat": latitude, "lon": longitude},
+                    "note": (
+                        "Historical weather fetched for field coordinates. "
+                        "Future dates use climate averages."
+                    ),
+                },
             }
         finally:
             if csv_file:
