@@ -357,14 +357,14 @@ export default function Simulate() {
             latitude:                40.0,
             longitude:               -89.0,
             initial_growth_stage:    'V8',
-            soil_nitrogen_ppm:       12,
+            soil_nitrogen_ppm:       10,
             soil_moisture_level:     'dry',
             recent_rain_event:       true,
             field_acres:             100,
             treatment_cost_per_acre: 25,
             commodity_price_usd_bu:  4.5,
         });
-        setFertEvents([{ id: 1, day: 7, amount: 80, fertType: 'urea' }]);
+        setFertEvents([]);
         setIrrigEvents([]);
         setActiveScenario('🌽 Problem Field — Drought + N Deficiency');
     };
