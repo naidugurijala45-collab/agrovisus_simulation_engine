@@ -55,6 +55,10 @@ class SimulationRequest(BaseModel):
     treatment_cost_per_acre: float = 25.0
     commodity_price_usd_bu: Optional[float] = None
     state_code: Optional[str] = None
+    soil_water_factor: Optional[float] = None  # 0.0–1.0 fraction of AWC; maps to initial_moisture_fraction_awc
+    soil_nitrogen_ppm: Optional[float] = None  # reserved for future N initialisation
+    initial_growth_stage: Optional[str] = None  # reserved for future stage initialisation
+    recent_rain_event: Optional[bool] = None   # reserved for future disease pressure seeding
 
 
 class DailyDataPoint(BaseModel):
@@ -90,6 +94,8 @@ def _build_config(req: SimulationRequest) -> Dict[str, Any]:
     cfg["simulation_settings"]["longitude_degrees"] = req.longitude
     cfg["simulation_settings"]["elevation_m"] = req.elevation_m
     cfg["crop_model_config"]["crop_template"] = req.crop_template
+    if req.soil_water_factor is not None:
+        cfg["simulation_settings"]["initial_moisture_fraction_awc"] = max(0.0, min(1.0, req.soil_water_factor))
 
     # Always override management_schedule from the request — even an empty list
     # must clear the config.json defaults so users don't inherit unintended events.

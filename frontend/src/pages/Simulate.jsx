@@ -97,7 +97,7 @@ function RoiScenario({ label, pct = 0, highlight }) {
     );
 }
 
-function RuleCard({ group }) {
+function RuleCard({ group, fieldAcres = 100, treatmentCostPerAcre = 25 }) {
     const sev = group.severity || 'Moderate';
     const sevStyle = SEVERITY_COLOR[sev] || SEVERITY_COLOR.Moderate;
     const roi = group.roi;
@@ -191,7 +191,7 @@ function RuleCard({ group }) {
                         {[
                             { label: 'Revenue at Risk', value: `${fmt$(roi.revenue_at_risk_per_acre)}/acre`, sub: `${fmt$(roi.revenue_at_risk_total)} total`, color: 'var(--red-400)' },
                             { label: 'Yield Loss', value: `${fmtDec(roi.estimated_yield_loss_bu_acre)} bu/acre`, sub: 'without treatment', color: 'var(--amber-400)' },
-                            { label: 'Treatment Cost', value: `${fmt$(roi.treatment_cost_total)} total`, sub: `${fmt$(roi.treatment_cost_total / Math.max(1, roi.revenue_at_risk_total / Math.max(0.01, roi.revenue_at_risk_per_acre)))}/acre`, color: 'var(--text-secondary)' },
+                            { label: 'Treatment Cost', value: `${fmt$(treatmentCostPerAcre)}/acre × ${fieldAcres} acres`, sub: `= ${fmt$(roi.treatment_cost_total)} total`, color: 'var(--text-secondary)' },
                         ].map(m => (
                             <div key={m.label} style={{
                                 padding: '10px 12px', borderRadius: 8,
@@ -350,6 +350,7 @@ export default function Simulate() {
         setForm(f => ({
             ...f,
             crop_template:        'corn',
+            start_date:           '2026-05-01',
             initial_growth_stage: 'V8',
             latitude:             40.0,
             longitude:            -89.0,
@@ -912,7 +913,7 @@ export default function Simulate() {
                                 </span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                {groupedRules.map((grp, i) => <RuleCard key={i} group={grp} />)}
+                                {groupedRules.map((grp, i) => <RuleCard key={i} group={grp} fieldAcres={form.field_acres} treatmentCostPerAcre={form.treatment_cost_per_acre} />)}
                             </div>
                         </div>
                         );

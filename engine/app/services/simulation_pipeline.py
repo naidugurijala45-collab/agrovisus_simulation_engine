@@ -1,7 +1,7 @@
 """simulation_pipeline.py — day-level pipeline for the AgroVisus simulation engine.
 
 Step execution order (strict dependency ordering):
-  1. ManagementStep      — apply irrigation/fertiliser events to models
+  1. ManagementStep      — apply irrigation/fertilizer events to models
   2. WeatherStep         — fetch weather + compute ET₀
   3. SoilStep            — capture pre-update crop state, then update soil water balance
   4. NutrientStep        — N transformations, uptake, NNI-based nitrogen stress
@@ -120,7 +120,7 @@ class _Step:
 # ---------------------------------------------------------------------------
 
 class ManagementStep(_Step):
-    """Apply irrigation and fertiliser management events for the day."""
+    """Apply irrigation and fertilizer management events for the day."""
 
     name = "management"
 

@@ -65,7 +65,7 @@
         "severity": "Moderate",
         "alert_type": "Nutrient Stress",
         "yield_impact_percent": 12.0,
-        "recommendation": "Available nitrogen is below 20 kg/ha. Apply top-dress nitrogen fertiliser to avoid yield penalty, especially before V6."
+        "recommendation": "Available nitrogen is below 20 kg/ha. Apply top-dress nitrogen fertilizer to avoid yield penalty, especially before V6."
       }
     },
     {
