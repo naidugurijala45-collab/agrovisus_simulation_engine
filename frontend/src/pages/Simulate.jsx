@@ -352,7 +352,7 @@ export default function Simulate() {
         setForm({
             ...DEFAULT_FORM,
             crop_template:           'corn',
-            start_date:              '2026-05-01',
+            start_date:              '2025-05-01',
             sim_days:                120,
             latitude:                40.0,
             longitude:               -89.0,
@@ -373,7 +373,7 @@ export default function Simulate() {
         setForm({
             ...DEFAULT_FORM,
             crop_template:           'corn',
-            start_date:              '2026-05-01',
+            start_date:              '2025-05-01',
             sim_days:                120,
             latitude:                40.0,
             longitude:               -89.0,
