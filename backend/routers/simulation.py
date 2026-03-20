@@ -96,6 +96,11 @@ def _build_config(req: SimulationRequest) -> Dict[str, Any]:
     cfg["crop_model_config"]["crop_template"] = req.crop_template
     if req.soil_water_factor is not None:
         cfg["simulation_settings"]["initial_moisture_fraction_awc"] = max(0.0, min(1.0, req.soil_water_factor))
+    if req.soil_nitrogen_ppm is not None:
+        # Convert ppm (mg/kg) → kg NO3-N/ha assuming 30 cm root depth, bulk density 1.33 g/cm³
+        # kg/ha ≈ ppm × depth_m × bulk_density_kg_m3 × 0.1  (unit chain: mg/kg × kg/m³ × m → mg/m² → kg/ha ÷1000×10000)
+        no3_kg_ha = round(req.soil_nitrogen_ppm * 2.0, 1)
+        cfg.setdefault("nutrient_model_config", {})["initial_nitrate_N_kg_ha"] = no3_kg_ha
 
     # Always override management_schedule from the request — even an empty list
     # must clear the config.json defaults so users don't inherit unintended events.

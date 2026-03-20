@@ -255,6 +255,7 @@ export default function Simulate() {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [activeScenario, setActiveScenario] = useState(null);
 
     const [fertEvents, setFertEvents] = useState([{ id: 1, day: 7, amount: 80, fertType: 'urea' }]);
     const [irrigEvents, setIrrigEvents] = useState([]);
@@ -301,6 +302,7 @@ export default function Simulate() {
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
+        setActiveScenario(null);
         setForm((f) => ({
             ...f,
             [name]: type === 'checkbox' ? checked
@@ -346,24 +348,46 @@ export default function Simulate() {
 
     const handleCancel = () => abortControllerRef.current?.abort();
 
-    const handleLoadDemo = () => {
-        setForm(f => ({
-            ...f,
-            crop_template:        'corn',
-            start_date:           '2026-05-01',
-            initial_growth_stage: 'V8',
-            latitude:             40.0,
-            longitude:            -89.0,
-            soil_nitrogen_ppm:    12,
-            soil_moisture_level:  'dry',
-            recent_rain_event:    true,
-            field_acres:          100,
+    const handleLoadScenario1 = () => {
+        setForm({
+            ...DEFAULT_FORM,
+            crop_template:           'corn',
+            start_date:              '2026-05-01',
+            sim_days:                120,
+            latitude:                40.0,
+            longitude:               -89.0,
+            initial_growth_stage:    'V8',
+            soil_nitrogen_ppm:       12,
+            soil_moisture_level:     'dry',
+            recent_rain_event:       true,
+            field_acres:             100,
             treatment_cost_per_acre: 25,
             commodity_price_usd_bu:  4.5,
-            sim_days:             120,
-        }));
+        });
         setFertEvents([{ id: 1, day: 7, amount: 80, fertType: 'urea' }]);
         setIrrigEvents([]);
+        setActiveScenario('🌽 Problem Field — Drought + N Deficiency');
+    };
+
+    const handleLoadScenario2 = () => {
+        setForm({
+            ...DEFAULT_FORM,
+            crop_template:           'corn',
+            start_date:              '2026-05-01',
+            sim_days:                120,
+            latitude:                40.0,
+            longitude:               -89.0,
+            initial_growth_stage:    'V8',
+            soil_nitrogen_ppm:       45,
+            soil_moisture_level:     'normal',
+            recent_rain_event:       false,
+            field_acres:             100,
+            treatment_cost_per_acre: 25,
+            commodity_price_usd_bu:  4.5,
+        });
+        setFertEvents([{ id: 1, day: 7, amount: 120, fertType: 'urea' }]);
+        setIrrigEvents([]);
+        setActiveScenario('✅ Well-Managed Field — Optimal Management');
     };
 
     const handleExportPDF = async () => {
@@ -412,18 +436,30 @@ export default function Simulate() {
 
             {/* Config Form */}
             <div className="card mb-4">
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
                     <button
                         type="button"
-                        onClick={handleLoadDemo}
+                        onClick={handleLoadScenario1}
+                        title="V8 corn — dry soil, low nitrogen, recent heavy rain"
                         style={{
-                            padding: '7px 16px', fontSize: '0.8rem', fontWeight: 600,
-                            background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.4)',
-                            color: '#fbbf24', borderRadius: 8, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 6,
+                            background: '#b45309', color: '#fff', border: 'none',
+                            borderRadius: 6, padding: '6px 14px', cursor: 'pointer',
+                            fontSize: 13, fontWeight: 600,
                         }}
                     >
-                        Load Demo Scenario 🌽
+                        🌽 Problem Field
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleLoadScenario2}
+                        title="V8 corn — normal moisture, adequate nitrogen, no stress"
+                        style={{
+                            background: '#15803d', color: '#fff', border: 'none',
+                            borderRadius: 6, padding: '6px 14px', cursor: 'pointer',
+                            fontSize: 13, fontWeight: 600,
+                        }}
+                    >
+                        ✅ Well-Managed Field
                     </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 16 }}>
@@ -769,6 +805,12 @@ export default function Simulate() {
             )}
 
             {result && (
+                <>
+                {activeScenario && (
+                    <div style={{ color: '#9ca3af', fontSize: 12, marginBottom: 8 }}>
+                        Scenario: {activeScenario}
+                    </div>
+                )}
                 <div ref={reportRef} style={{ background: 'var(--bg-primary)', padding: '20px 0' }}>
                     <div className="pdf-only-title" style={{ display: 'none' }}>
                         <h2 style={{ margin: 0, color: 'var(--green-400)' }}>AgroVisus Platform</h2>
@@ -948,6 +990,7 @@ export default function Simulate() {
                         </button>
                     </div>
                 </div>
+                </>
             )}
         </div>
     );
