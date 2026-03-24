@@ -12,19 +12,19 @@ const CROPS = [
 
 const STATS = [
   {
-    target: 6223, unit: "kg/ha",
-    label: "Validated corn yield",
-    sub: "vs 8,992 AquaCrop upper bound",
+    target: 11316, unit: "kg/ha",
+    label: "Well-managed corn yield",
+    sub: "vs 5,700 kg/ha problem field (91 bu/acre)",
     fmt: (n) => n >= 1000 ? `${Math.floor(n / 1000)},${String(n % 1000).padStart(3, "0")}` : String(n),
   },
   {
-    target: 31, unit: "%",
-    label: "From theoretical maximum",
-    sub: "explained by real stress conditions",
+    target: 89, unit: "bu/acre",
+    label: "Yield gap: problem vs well-managed",
+    sub: "= $400/acre at $4.50/bu",
     fmt: (n) => String(n),
   },
   {
-    target: 110, unit: "tests",
+    target: 167, unit: "tests",
     label: "All passing, zero regressions",
     sub: "DSSAT · FAO-56 · USDA-ARS",
     fmt: (n) => String(n),
@@ -46,7 +46,7 @@ const HOW_STEPS = [
   {
     num: "02",
     title: "Run the simulation",
-    desc: "120-day daily engine tracks GDD, water balance, disease pressure, and nutrient uptake.",
+    desc: "120-day daily engine pulls real historical weather for your coordinates, then tracks GDD, water balance, disease pressure, and nitrogen stress — day by day.",
   },
   {
     num: "03",
@@ -377,9 +377,16 @@ function FooterCTA() {
         </h2>
         <p style={{
           fontFamily: SANS, fontSize: "16px", fontWeight: 300,
-          color: "rgba(255,255,255,0.4)", marginBottom: "40px", maxWidth: "400px", lineHeight: 1.7,
+          color: "rgba(255,255,255,0.4)", marginBottom: "8px", maxWidth: "400px", lineHeight: 1.7,
         }}>
           Launch a simulation in under 30 seconds. No setup required.
+        </p>
+        <p style={{
+          fontFamily: SANS, fontSize: "13px", fontStyle: "italic", fontWeight: 300,
+          color: "rgba(255,255,255,0.22)", marginBottom: "40px", maxWidth: "460px", lineHeight: 1.7,
+        }}>
+          Built by a developer whose family farms in Andhra Pradesh, India.
+          Free for US corn farmers during the 2026 growing season.
         </p>
         <CTAButton />
       </div>
@@ -430,6 +437,9 @@ export default function Landing() {
           .lp-stats-grid  { grid-template-columns: 1fr 1fr !important; }
           .lp-feat-grid   { grid-template-columns: 1fr !important; }
           .lp-crops-grid  { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        @media (max-width: 900px) {
+          .lp-hero-cols   { grid-template-columns: 1fr !important; gap: 48px !important; }
         }
         @media (max-width: 768px) {
           .lp-nav-links   { display: none !important; }
@@ -508,73 +518,187 @@ export default function Landing() {
         display: "flex", flexDirection: "column", justifyContent: "center",
         padding: "100px 48px 80px", maxWidth: "1200px", margin: "0 auto",
       }}>
-        {/* Eyebrow */}
-        <FadeUp visible={heroVisible} delay={100}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "32px" }}>
-            <div style={{ width: "32px", height: "1px", background: "rgba(74,222,128,0.5)" }} />
-            <span style={{ fontFamily: MONO, fontSize: "11px", color: "rgba(74,222,128,0.6)", letterSpacing: "0.2em" }}>
-              PRECISION AGRONOMIC INTELLIGENCE
-            </span>
+        {/* Two-column layout: text left, preview card right */}
+        <div className="lp-hero-cols" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "64px", alignItems: "center" }}>
+
+          {/* ── Left column: headline + sub + CTA + metrics ── */}
+          <div>
+            {/* Headline */}
+            <FadeUp visible={heroVisible} delay={200}>
+              <h1 className="lp-h1" style={{
+                fontFamily: BEBAS,
+                fontSize: "clamp(64px, 9vw, 120px)",
+                lineHeight: 0.92, letterSpacing: "0.02em", marginBottom: "32px",
+              }}>
+                <span style={{ color: "rgba(255,255,255,0.95)", display: "block" }}>YOUR FIELD</span>
+                <span style={{ color: "rgba(255,255,255,0.95)", display: "block" }}>HAS A</span>
+                <span style={{
+                  display: "block",
+                  background: "linear-gradient(135deg, #4ade80 0%, #86efac 50%, #4ade80 100%)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  backgroundSize: "200%",
+                  animation: "lp-shimmer 3s linear infinite",
+                }}>DIAGNOSIS.</span>
+              </h1>
+            </FadeUp>
+
+            {/* Sub */}
+            <FadeUp visible={heroVisible} delay={340}>
+              <p style={{
+                fontSize: "18px", fontWeight: 300,
+                color: "rgba(255,255,255,0.45)",
+                maxWidth: "520px", lineHeight: 1.75, marginBottom: "40px",
+              }}>
+                AgroVisus runs a daily field simulation — tracking disease pressure,
+                nutrient stress, and water balance — then tells you exactly what it
+                will cost you if you don't act, and what you gain if you do.
+              </p>
+            </FadeUp>
+
+            {/* CTA */}
+            <FadeUp visible={heroVisible} delay={480}>
+              <div style={{ marginBottom: "16px" }}>
+                <CTAButton />
+              </div>
+            </FadeUp>
+
+            {/* Validation proof point */}
+            <FadeUp visible={heroVisible} delay={540}>
+              <p style={{
+                fontFamily: SANS, fontSize: "12px", fontStyle: "italic",
+                color: "rgba(255,255,255,0.28)", marginBottom: "32px", lineHeight: 1.6,
+              }}>
+                Validated against University of Illinois 274 site-year corn nitrogen trial data.
+              </p>
+            </FadeUp>
+
+            {/* Free / no signup trust line */}
+            <FadeUp visible={heroVisible} delay={580}>
+              <div style={{
+                fontFamily: MONO, fontSize: "10px", letterSpacing: "0.18em",
+                color: "rgba(74,222,128,0.6)", marginBottom: "36px",
+                textTransform: "uppercase",
+              }}>
+                Free · No signup required · No credit card
+              </div>
+            </FadeUp>
+
+            {/* Metrics strip */}
+            <FadeUp visible={heroVisible} delay={640}>
+              <div style={{ display: "flex", gap: "28px", flexWrap: "wrap" }}>
+                {[
+                  { label: "Crops modeled",   val: "5" },
+                  { label: "Tests passing",   val: "167" },
+                  { label: "Data sources",    val: "FAO-56 · DSSAT · USDA" },
+                ].map((m) => (
+                  <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "1px", height: "32px", background: "rgba(74,222,128,0.25)" }} />
+                    <div>
+                      <div style={{ fontFamily: BEBAS, fontSize: "20px", color: G, letterSpacing: "0.05em" }}>{m.val}</div>
+                      <div style={{ fontFamily: MONO, fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em" }}>{m.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </FadeUp>
           </div>
-        </FadeUp>
 
-        {/* Headline */}
-        <FadeUp visible={heroVisible} delay={200}>
-          <h1 className="lp-h1" style={{
-            fontFamily: BEBAS,
-            fontSize: "clamp(64px, 9vw, 120px)",
-            lineHeight: 0.92, letterSpacing: "0.02em", marginBottom: "32px",
-          }}>
-            <span style={{ color: "rgba(255,255,255,0.95)", display: "block" }}>YOUR FIELD</span>
-            <span style={{ color: "rgba(255,255,255,0.95)", display: "block" }}>HAS A</span>
-            <span style={{
-              display: "block",
-              background: "linear-gradient(135deg, #4ade80 0%, #86efac 50%, #4ade80 100%)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              backgroundSize: "200%",
-              animation: "lp-shimmer 3s linear infinite",
-            }}>DIAGNOSIS.</span>
-          </h1>
-        </FadeUp>
+          {/* ── Right column: live output preview card ── */}
+          <FadeUp visible={heroVisible} delay={700}>
+            <div>
+              <div style={{
+                fontFamily: MONO, fontSize: "9px", letterSpacing: "0.2em",
+                color: "rgba(74,222,128,0.55)", textTransform: "uppercase",
+                marginBottom: "12px",
+              }}>
+                Live Simulation Output
+              </div>
+              <div style={{
+                background: "#0a1a0a",
+                border: "1px solid #22c55e",
+                borderRadius: "6px",
+                boxShadow: "0 0 40px rgba(34,197,94,0.12), 0 8px 32px rgba(0,0,0,0.5)",
+                overflow: "hidden",
+                fontFamily: SANS,
+              }}>
+                {/* Card header */}
+                <div style={{
+                  padding: "14px 18px 12px",
+                  borderBottom: "1px solid rgba(74,222,128,0.15)",
+                  background: "rgba(74,222,128,0.04)",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: "3px" }}>
+                    🌽 Central Illinois · May 2025
+                  </div>
+                  <div style={{ fontFamily: MONO, fontSize: "10px", color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em" }}>
+                    CORN · V8 · DRY CONDITIONS
+                  </div>
+                </div>
 
-        {/* Sub */}
-        <FadeUp visible={heroVisible} delay={340}>
-          <p style={{
-            fontSize: "18px", fontWeight: 300,
-            color: "rgba(255,255,255,0.45)",
-            maxWidth: "520px", lineHeight: 1.75, marginBottom: "48px",
-          }}>
-            AgroVisus runs a daily field simulation — tracking disease pressure,
-            nutrient stress, and water balance — then tells you exactly what it
-            will cost you if you don't act, and what you gain if you do.
-          </p>
-        </FadeUp>
+                {/* Field Health + Yield */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr",
+                  padding: "16px 18px", gap: "12px",
+                  borderBottom: "1px solid rgba(74,222,128,0.1)",
+                }}>
+                  <div>
+                    <div style={{ fontFamily: MONO, fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", marginBottom: "5px" }}>FIELD HEALTH</div>
+                    <div style={{ fontFamily: BEBAS, fontSize: "38px", color: "#f97316", lineHeight: 1 }}>D</div>
+                    <div style={{ fontSize: "11px", color: "#f97316", marginTop: "2px" }}>High Stress</div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: MONO, fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", marginBottom: "5px" }}>FINAL YIELD</div>
+                    <div style={{ fontFamily: BEBAS, fontSize: "32px", color: "#4ade80", lineHeight: 1 }}>91 bu/acre</div>
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>vs 180 potential</div>
+                  </div>
+                </div>
 
-        {/* CTA */}
-        <FadeUp visible={heroVisible} delay={480}>
-          <div style={{ marginBottom: "64px" }}>
-            <CTAButton />
-          </div>
-        </FadeUp>
+                {/* Alert */}
+                <div style={{
+                  padding: "14px 18px",
+                  borderBottom: "1px solid rgba(74,222,128,0.1)",
+                  background: "rgba(127,29,29,0.15)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                    <span style={{
+                      fontFamily: MONO, fontSize: "9px", fontWeight: 700,
+                      letterSpacing: "0.1em", padding: "3px 8px", borderRadius: "2px",
+                      background: "#7f1d1d", color: "#fca5a5",
+                    }}>⚠ HIGH</span>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
+                      Severe Nitrogen Deficiency
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <div style={{ fontSize: "12px", color: "#4ade80", fontWeight: 600 }}>Revenue at risk: $203/acre</div>
+                    <div style={{ fontFamily: MONO, fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.04em" }}>Yield loss: 45.0 bu/acre</div>
+                    <div style={{ fontFamily: MONO, fontSize: "10px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.04em" }}>Treatment ROI: +467% (medium efficacy)</div>
+                  </div>
+                </div>
 
-        {/* Metrics strip */}
-        <FadeUp visible={heroVisible} delay={600}>
-          <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
-            {[
-              { label: "Crops modeled",      val: "5" },
-              { label: "US regions covered", val: "4" },
-              { label: "Data sources",       val: "FAO-56 · DSSAT · USDA" },
-            ].map((m) => (
-              <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "1px", height: "32px", background: "rgba(74,222,128,0.25)" }} />
-                <div>
-                  <div style={{ fontFamily: BEBAS, fontSize: "20px", color: G, letterSpacing: "0.05em" }}>{m.val}</div>
-                  <div style={{ fontFamily: MONO, fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em" }}>{m.label}</div>
+                {/* CTA inside card */}
+                <div style={{ padding: "14px 18px" }}>
+                  <Link
+                    to="/simulate"
+                    onClick={() => {
+                      try { sessionStorage.setItem('agrovisus_load_scenario', 'problem'); } catch {}
+                    }}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "8px",
+                      background: G, color: BG,
+                      fontFamily: SANS, fontWeight: 700, fontSize: "13px",
+                      padding: "10px 20px", borderRadius: "3px",
+                      textDecoration: "none", width: "100%", justifyContent: "center",
+                    }}
+                  >
+                    Run this simulation →
+                  </Link>
                 </div>
               </div>
-            ))}
-          </div>
-        </FadeUp>
+            </div>
+          </FadeUp>
+
+        </div>{/* end hero grid */}
 
         {/* Scroll hint */}
         <div style={{

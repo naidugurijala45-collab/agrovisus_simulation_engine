@@ -324,6 +324,18 @@ export default function Simulate() {
             .catch(() => setTemplates([{ id: 'corn', name: 'Corn' }, { id: 'wheat', name: 'Wheat' }]));
     }, []);
 
+    // Auto-load scenario from landing page "Run this simulation" card
+    useEffect(() => {
+        try {
+            const flag = sessionStorage.getItem('agrovisus_load_scenario');
+            if (flag === 'problem') {
+                sessionStorage.removeItem('agrovisus_load_scenario');
+                handleLoadScenario1();
+            }
+        } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setActiveScenario(null);
