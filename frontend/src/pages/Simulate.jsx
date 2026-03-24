@@ -274,6 +274,7 @@ export default function Simulate() {
         }
     });
     const [loading, setLoading] = useState(false);
+    const [comparisonLoading, setComparisonLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeScenario, setActiveScenario] = useState(null);
     const [scenario1Result, setScenario1Result] = useState(null); // Problem Field
@@ -325,14 +326,24 @@ export default function Simulate() {
     }, []);
 
     // Auto-load scenario from landing page "Run this simulation" card
+    // or auto-trigger comparison from ?comparison=true query param
     useEffect(() => {
         try {
             const flag = sessionStorage.getItem('agrovisus_load_scenario');
             if (flag === 'problem') {
                 sessionStorage.removeItem('agrovisus_load_scenario');
                 handleLoadScenario1();
+                return;
             }
         } catch {}
+
+        // Auto-trigger comparison mode from landing page hero card
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('comparison') === 'true') {
+            // Clean the URL so refresh doesn't re-trigger
+            window.history.replaceState({}, '', window.location.pathname);
+            setTimeout(() => handleRunComparison(), 500);
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -441,6 +452,83 @@ export default function Simulate() {
         setPendingScenario('wellManaged');
     };
 
+    const handleRunComparison = async () => {
+        setComparisonLoading(true);
+        setError(null);
+        setResult(null);
+        setScenario1Result(null);
+        setScenario2Result(null);
+
+        try {
+            // Step 1: Run Problem Field scenario
+            const problemPayload = {
+                ...DEFAULT_FORM,
+                crop_template:           'corn',
+                start_date:              '2025-05-01',
+                sim_days:                120,
+                latitude:                40.0,
+                longitude:               -89.0,
+                initial_growth_stage:    'V8',
+                soil_nitrogen_ppm:       10,
+                soil_moisture_level:     'dry',
+                soil_water_factor:       0.4,
+                recent_rain_event:       true,
+                field_acres:             parseFloat(form.field_acres) || 100,
+                treatment_cost_per_acre: parseFloat(form.treatment_cost_per_acre) || 25,
+                commodity_price_usd_bu:  4.5,
+                management_schedule:     [],
+            };
+
+            const problem = await runSimulation(problemPayload);
+            setScenario1Result({ ...problem, _form: { commodity_price_usd_bu: 4.5, field_acres: problemPayload.field_acres } });
+            setActiveScenario('🌽 Problem Field — Drought + N Deficiency');
+
+            // Step 2: Run Well-Managed scenario
+            const irrigSchedule = Array.from({ length: Math.ceil((119 - 28) / 7) + 1 }, (_, i) => ({
+                type: 'irrigation', day: 28 + i * 7, amount_mm: 35,
+            }));
+            const wellPayload = {
+                ...DEFAULT_FORM,
+                crop_template:           'corn',
+                start_date:              '2025-05-01',
+                sim_days:                120,
+                latitude:                40.0,
+                longitude:               -89.0,
+                initial_growth_stage:    'V8',
+                soil_nitrogen_ppm:       45,
+                soil_moisture_level:     'wet',
+                soil_water_factor:       0.95,
+                recent_rain_event:       false,
+                field_acres:             parseFloat(form.field_acres) || 100,
+                treatment_cost_per_acre: parseFloat(form.treatment_cost_per_acre) || 25,
+                commodity_price_usd_bu:  4.5,
+                management_schedule:     [
+                    { type: 'fertilizer', day: 7, amount_kg_ha: 120, fertilizer_type: 'urea' },
+                    ...irrigSchedule,
+                ].sort((a, b) => a.day - b.day),
+            };
+
+            const wellManaged = await runSimulation(wellPayload);
+            setScenario2Result({ ...wellManaged, _form: { commodity_price_usd_bu: 4.5, field_acres: wellPayload.field_acres } });
+
+            // Step 3: Show Well-Managed as the active result + auto-scroll
+            setResult(wellManaged);
+            setForm(f => ({ ...f, commodity_price_usd_bu: 4.5, field_acres: wellPayload.field_acres }));
+            setActiveScenario('✅ Well-Managed Field — Center-Pivot Irrigation + Adequate N');
+
+            setTimeout(() => {
+                const el = document.getElementById('comparison-panel');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+
+        } catch (err) {
+            console.error('Comparison run failed:', err);
+            setError(err.response?.data?.detail || err.message || 'Comparison run failed');
+        } finally {
+            setComparisonLoading(false);
+        }
+    };
+
     const handleExportPDF = async () => {
         if (!reportRef.current) return;
         const ok = await exportElementToPDF(reportRef.current, `agrovisus-sim-report-${form.start_date || 'latest'}.pdf`);
@@ -487,15 +575,37 @@ export default function Simulate() {
 
             {/* Config Form */}
             <div className="card mb-4">
-                <div className="scenario-btn-row" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+                <div className="scenario-btn-row" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                    <button
+                        type="button"
+                        onClick={handleRunComparison}
+                        disabled={comparisonLoading || loading}
+                        title="Runs both scenarios automatically and shows side-by-side yield gap"
+                        style={{
+                            background: (comparisonLoading || loading) ? '#1a2e1a' : '#1d4ed8',
+                            color: '#fff',
+                            border: '1px solid #3b82f6',
+                            borderRadius: 6, padding: '6px 14px',
+                            cursor: (comparisonLoading || loading) ? 'not-allowed' : 'pointer',
+                            fontSize: 13, fontWeight: 600,
+                            opacity: (comparisonLoading || loading) ? 0.7 : 1,
+                            order: 3,
+                        }}
+                    >
+                        {comparisonLoading ? '⏳ Running...' : '📊 Compare Scenarios'}
+                    </button>
                     <button
                         type="button"
                         onClick={handleLoadScenario1}
+                        disabled={comparisonLoading}
                         title="V8 corn — dry soil, low nitrogen, recent heavy rain"
                         style={{
                             background: '#b45309', color: '#fff', border: 'none',
-                            borderRadius: 6, padding: '6px 14px', cursor: 'pointer',
+                            borderRadius: 6, padding: '6px 14px',
+                            cursor: comparisonLoading ? 'not-allowed' : 'pointer',
                             fontSize: 13, fontWeight: 600,
+                            opacity: comparisonLoading ? 0.5 : 1,
+                            order: 1,
                         }}
                     >
                         🌽 Problem Field
@@ -503,16 +613,33 @@ export default function Simulate() {
                     <button
                         type="button"
                         onClick={handleLoadScenario2}
+                        disabled={comparisonLoading}
                         title="V8 corn — normal moisture, adequate nitrogen, no stress"
                         style={{
                             background: '#15803d', color: '#fff', border: 'none',
-                            borderRadius: 6, padding: '6px 14px', cursor: 'pointer',
+                            borderRadius: 6, padding: '6px 14px',
+                            cursor: comparisonLoading ? 'not-allowed' : 'pointer',
                             fontSize: 13, fontWeight: 600,
+                            opacity: comparisonLoading ? 0.5 : 1,
+                            order: 2,
                         }}
                     >
                         ✅ Well-Managed Field
                     </button>
                 </div>
+                {comparisonLoading && (
+                    <div style={{
+                        color: '#6b7280',
+                        fontSize: '12px',
+                        marginBottom: 12,
+                        fontStyle: 'italic',
+                        textAlign: 'right',
+                    }}>
+                        {scenario1Result ?
+                            '✓ Problem Field done — running Well-Managed...' :
+                            'Running Problem Field simulation...'}
+                    </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 16 }}>
                     <div className="form-group">
                         <label className="form-label">Crop Template</label>
@@ -855,6 +982,17 @@ export default function Simulate() {
                 </div>
             )}
 
+            {comparisonLoading && (
+                <div className="spinner-wrap">
+                    <div className="spinner" />
+                    <p className="text-muted">
+                        {scenario1Result
+                            ? '✓ Problem Field complete — running Well-Managed simulation…'
+                            : 'Running Problem Field simulation…'}
+                    </p>
+                </div>
+            )}
+
             {result && (
                 <>
                 {activeScenario && (
@@ -874,7 +1012,7 @@ export default function Simulate() {
                     const gap_total = gap_dollar_acre * fieldAcres;
                     const barPct = wm_bu > 0 ? Math.min(100, Math.max(0, (pf_bu / wm_bu) * 100)) : 0;
                     return (
-                        <div style={{
+                        <div id="comparison-panel" style={{
                             marginBottom: 20, borderRadius: 12, overflow: 'hidden',
                             border: '1px solid rgba(74,222,128,0.25)', background: 'var(--bg-card)',
                         }}>

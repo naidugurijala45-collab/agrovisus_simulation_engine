@@ -679,10 +679,7 @@ export default function Landing() {
                 {/* CTA inside card */}
                 <div style={{ padding: "14px 18px" }}>
                   <Link
-                    to="/simulate"
-                    onClick={() => {
-                      try { sessionStorage.setItem('agrovisus_load_scenario', 'problem'); } catch {}
-                    }}
+                    to="/simulate?comparison=true"
                     style={{
                       display: "inline-flex", alignItems: "center", gap: "8px",
                       background: G, color: BG,

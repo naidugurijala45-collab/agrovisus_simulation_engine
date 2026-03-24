@@ -1712,7 +1712,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     grid-template-columns: 1fr !important;
   }
 
-  /* Scenario buttons: full width stacked */
+  /* Scenario buttons: full width stacked, Compare first on mobile */
   .scenario-btn-row {
     flex-direction: column;
     gap: 8px;
@@ -1721,4 +1721,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .scenario-btn-row button {
     width: 100%;
   }
+
+  /* On mobile, reorder: Compare (1st), Problem (2nd), Well-Managed (3rd) */
+  .scenario-btn-row button:nth-child(1) { order: -1 !important; }  /* Compare Scenarios */
+  .scenario-btn-row button:nth-child(2) { order: 0 !important; }   /* Problem Field */
+  .scenario-btn-row button:nth-child(3) { order: 1 !important; }   /* Well-Managed */
 }
