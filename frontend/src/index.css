@@ -470,7 +470,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* ── Chart Wrapper ──────────────────────────────────────────────────────── */
 .chart-wrap {
   width: 100%;
-  height: 260px;
+  height: 280px;
 }
 
 /* ── Dropzone ───────────────────────────────────────────────────────────── */
@@ -1695,5 +1695,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .card-grid-4 {
     grid-template-columns: 1fr 1fr;
+  }
+
+  /* Simulate page — summary bar: 2×2 grid */
+  .sim-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Simulate page — charts: single column */
+  .card-grid.card-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Scenario comparison: stack vertically */
+  .scenario-compare-cols {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Scenario buttons: full width stacked */
+  .scenario-btn-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .scenario-btn-row button {
+    width: 100%;
   }
 }

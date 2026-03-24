@@ -8,6 +8,7 @@ import {
     Legend,
     Line,
     LineChart,
+    ReferenceLine,
     ResponsiveContainer,
     Tooltip,
     XAxis, YAxis,
@@ -71,6 +72,25 @@ function fmtDateFull(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function kgHaToBuAcre(kg_ha) { return (kg_ha || 0) / 62.77; }
+
+const GRADE_STYLE = {
+    A: { color: '#22c55e', label: 'Excellent' },
+    B: { color: '#84cc16', label: 'Good' },
+    C: { color: '#f59e0b', label: 'Moderate Stress' },
+    D: { color: '#f97316', label: 'High Stress' },
+    F: { color: '#ef4444', label: 'Critical' },
+};
+
+function getFieldHealthGrade(yieldKgHa, highAlerts, modAlerts) {
+    const bu = kgHaToBuAcre(yieldKgHa);
+    if (bu < 80) return 'F';
+    if (highAlerts >= 2 || bu < 110) return 'D';
+    if (highAlerts >= 1 || bu < 140) return 'C';
+    if (highAlerts === 0 && bu > 170 && modAlerts <= 1) return 'A';
+    return 'B';
 }
 
 function RoiScenario({ label, pct = 0, highlight }) {
@@ -256,6 +276,10 @@ export default function Simulate() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeScenario, setActiveScenario] = useState(null);
+    const [scenario1Result, setScenario1Result] = useState(null); // Problem Field
+    const [scenario2Result, setScenario2Result] = useState(null); // Well-Managed
+    const [pendingScenario, setPendingScenario] = useState(null); // 'problem' | 'wellManaged'
+    const [weatherStripOpen, setWeatherStripOpen] = useState(false);
 
     const [fertEvents, setFertEvents] = useState([{ id: 1, day: 7, amount: 80, fertType: 'urea' }]);
     const [irrigEvents, setIrrigEvents] = useState([]);
@@ -337,6 +361,12 @@ export default function Simulate() {
             };
             const data = await runSimulation(payload, { signal: abortControllerRef.current.signal });
             setResult(data);
+            if (pendingScenario === 'problem') {
+                setScenario1Result({ ...data, _form: { commodity_price_usd_bu: payload.commodity_price_usd_bu, field_acres: payload.field_acres } });
+            } else if (pendingScenario === 'wellManaged') {
+                setScenario2Result({ ...data, _form: { commodity_price_usd_bu: payload.commodity_price_usd_bu, field_acres: payload.field_acres } });
+            }
+            setPendingScenario(null);
         } catch (e) {
             if (axios.isCancel(e)) setError('Simulation cancelled.');
             else setError(e.response?.data?.detail || e.message || 'Simulation failed');
@@ -367,6 +397,7 @@ export default function Simulate() {
         setFertEvents([]);
         setIrrigEvents([]);
         setActiveScenario('🌽 Problem Field — Drought + N Deficiency');
+        setPendingScenario('problem');
     };
 
     const handleLoadScenario2 = () => {
@@ -388,6 +419,7 @@ export default function Simulate() {
         setFertEvents([{ id: 1, day: 7, amount: 120, fertType: 'urea' }]);
         setIrrigEvents([]);
         setActiveScenario('✅ Well-Managed Field — Optimal Management');
+        setPendingScenario('wellManaged');
     };
 
     const handleExportPDF = async () => {
@@ -436,7 +468,7 @@ export default function Simulate() {
 
             {/* Config Form */}
             <div className="card mb-4">
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+                <div className="scenario-btn-row" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
                     <button
                         type="button"
                         onClick={handleLoadScenario1}
@@ -811,6 +843,69 @@ export default function Simulate() {
                         Scenario: {activeScenario}
                     </div>
                 )}
+
+                {/* Scenario Comparison Panel — shown only when both scenarios have been run */}
+                {scenario1Result && scenario2Result && (() => {
+                    const pf_bu = kgHaToBuAcre(scenario1Result.final_yield_kg_ha || 0);
+                    const wm_bu = kgHaToBuAcre(scenario2Result.final_yield_kg_ha || 0);
+                    const gap_bu = wm_bu - pf_bu;
+                    const commodityPrice = parseFloat(form.commodity_price_usd_bu) || 4.5;
+                    const fieldAcres = parseFloat(form.field_acres) || 100;
+                    const gap_dollar_acre = gap_bu * commodityPrice;
+                    const gap_total = gap_dollar_acre * fieldAcres;
+                    const barPct = wm_bu > 0 ? Math.min(100, Math.max(0, (pf_bu / wm_bu) * 100)) : 0;
+                    return (
+                        <div style={{
+                            marginBottom: 20, borderRadius: 12, overflow: 'hidden',
+                            border: '1px solid rgba(74,222,128,0.25)', background: 'var(--bg-card)',
+                        }}>
+                            {/* Header */}
+                            <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', background: 'rgba(74,222,128,0.05)' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--green-400)' }}>
+                                    📊 Scenario Comparison
+                                </span>
+                            </div>
+                            {/* Two columns */}
+                            <div className="scenario-compare-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
+                                <div style={{ padding: '16px 20px', borderRight: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#b45309', marginBottom: 6 }}>🌽 Problem Field</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f59e0b', lineHeight: 1 }}>{fmtDec(pf_bu, 1)}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>bu/acre</div>
+                                </div>
+                                <div style={{ padding: '16px 20px' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#15803d', marginBottom: 6 }}>✅ Well-Managed</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#4ade80', lineHeight: 1 }}>{fmtDec(wm_bu, 1)}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>bu/acre</div>
+                                </div>
+                            </div>
+                            {/* Gap row */}
+                            <div style={{ padding: '16px 20px' }}>
+                                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#f0fdf4', marginBottom: 12 }}>
+                                    Yield Gap:&nbsp;
+                                    <span style={{ color: '#fbbf24' }}>{fmtDec(gap_bu, 1)} bu/acre</span>
+                                    &nbsp;=&nbsp;
+                                    <span style={{ color: '#fbbf24' }}>${fmtDec(gap_dollar_acre, 0)}/acre</span>
+                                    &nbsp;=&nbsp;
+                                    <span style={{ color: '#fbbf24' }}>${Number(gap_total).toLocaleString('en-US', { maximumFractionDigits: 0 })} total</span>
+                                </div>
+                                {/* Progress bar */}
+                                <div style={{ height: 12, borderRadius: 999, overflow: 'hidden', background: '#15803d', position: 'relative' }}>
+                                    <div style={{
+                                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                                        width: `${barPct}%`,
+                                        background: '#b45309',
+                                        borderRadius: '999px 0 0 999px',
+                                        transition: 'width 0.5s ease',
+                                    }} />
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                    <span style={{ color: '#b45309' }}>Problem Field</span>
+                                    <span style={{ color: '#15803d' }}>Well-Managed</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
                 <div ref={reportRef} style={{ background: 'var(--bg-primary)', padding: '20px 0' }}>
                     <div className="pdf-only-title" style={{ display: 'none' }}>
                         <h2 style={{ margin: 0, color: 'var(--green-400)' }}>AgroVisus Platform</h2>
@@ -822,21 +917,38 @@ export default function Simulate() {
                     {(() => {
                         const dis = result.max_disease_severity ?? 0;
                         const diseaseColor = dis > 5 ? '#f87171' : dis >= 1 ? '#fbbf24' : '#4ade80';
-                        const kpis = [
-                            { label: 'Final Biomass',    value: `${result.total_biomass_kg_ha?.toFixed(0)} kg/ha`, sub: 'Total dry matter', border: '#14b8a6' },
-                            { label: 'Final Yield',      value: `${result.final_yield_kg_ha?.toFixed(0)} kg/ha`,   sub: 'Grain yield',      border: '#22c55e' },
-                            { label: 'Total Irrigation', value: `${result.total_irrigation_mm?.toFixed(0)} mm`,    sub: 'Applied water',    border: '#38bdf8' },
-                            { label: 'Max Disease',      value: `${dis.toFixed(1)}%`,                              sub: 'Peak severity',    border: diseaseColor },
-                        ];
+                        const yieldBu = kgHaToBuAcre(result.final_yield_kg_ha || 0);
+                        const highAlerts = groupedRules.filter(r => ['High','Critical'].includes(r.severity)).length;
+                        const modAlerts  = groupedRules.filter(r => ['Moderate','Medium'].includes(r.severity)).length;
+                        const grade = getFieldHealthGrade(result.final_yield_kg_ha, highAlerts, modAlerts);
+                        const gradeStyle = GRADE_STYLE[grade];
                         return (
-                            <div className="card-grid card-grid-4 mb-4">
-                                {kpis.map((s) => (
-                                    <div className="stat-tile" key={s.label} style={{ borderLeft: `3px solid ${s.border}` }}>
-                                        <span className="stat-label">{s.label}</span>
-                                        <span className="stat-value">{s.value}</span>
-                                        <span className="stat-sub">{s.sub}</span>
-                                    </div>
-                                ))}
+                            <div className="card-grid sim-kpi-grid mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
+                                <div className="stat-tile" style={{ borderLeft: '3px solid #14b8a6' }}>
+                                    <span className="stat-label">TOTAL BIOMASS (DM)</span>
+                                    <span className="stat-value">{result.total_biomass_kg_ha?.toFixed(0)}</span>
+                                    <span className="stat-sub">kg/ha · Total dry matter</span>
+                                </div>
+                                <div className="stat-tile" style={{ borderLeft: '3px solid #22c55e' }}>
+                                    <span className="stat-label">FINAL YIELD</span>
+                                    <span className="stat-value" style={{ fontSize: '1.6rem' }}>{fmtDec(yieldBu, 1)} bu/acre</span>
+                                    <span className="stat-sub">{Number(result.final_yield_kg_ha).toLocaleString('en-US', { maximumFractionDigits: 0 })} kg/ha · Grain yield</span>
+                                </div>
+                                <div className="stat-tile" style={{ borderLeft: '3px solid #38bdf8' }}>
+                                    <span className="stat-label">TOTAL IRRIGATION</span>
+                                    <span className="stat-value">{result.total_irrigation_mm?.toFixed(0)}</span>
+                                    <span className="stat-sub">mm · Applied water</span>
+                                </div>
+                                <div className="stat-tile" style={{ borderLeft: `3px solid ${diseaseColor}` }}>
+                                    <span className="stat-label">MAX DISEASE</span>
+                                    <span className="stat-value" style={{ color: diseaseColor }}>{dis.toFixed(1)}%</span>
+                                    <span className="stat-sub">Peak severity</span>
+                                </div>
+                                <div className="stat-tile" style={{ borderLeft: `3px solid ${gradeStyle.color}` }}>
+                                    <span className="stat-label">FIELD HEALTH</span>
+                                    <span className="stat-value" style={{ fontSize: '2.4rem', color: gradeStyle.color }}>{grade}</span>
+                                    <span className="stat-sub" style={{ color: gradeStyle.color }}>{gradeStyle.label}</span>
+                                </div>
                             </div>
                         );
                     })()}
@@ -867,7 +979,7 @@ export default function Simulate() {
                                         <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} />
                                         <Tooltip contentStyle={CHART_STYLE} />
-                                        <Area type="monotone" dataKey="biomass_kg_ha" stroke="#22c55e" fill="url(#biomassGrad)" strokeWidth={2} dot={false} />
+                                        <Area type="monotone" dataKey="biomass_kg_ha" stroke="#22c55e" fill="url(#biomassGrad)" strokeWidth={2.5} dot={false} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -882,7 +994,7 @@ export default function Simulate() {
                                         <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} domain={[0, 1.2]} />
                                         <Tooltip contentStyle={CHART_STYLE} />
-                                        <Line type="monotone" dataKey="soil_moisture" stroke="#38bdf8" strokeWidth={2} dot={false} name="Soil Moisture" />
+                                        <Line type="monotone" dataKey="soil_moisture" stroke="#38bdf8" strokeWidth={2.5} dot={false} name="Soil Moisture" />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
@@ -898,9 +1010,10 @@ export default function Simulate() {
                                         <YAxis stroke="var(--text-muted)" fontSize={11} domain={[0, 1]} />
                                         <Tooltip contentStyle={CHART_STYLE} />
                                         <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
-                                        <Line type="monotone" dataKey="water_stress" stroke="#f87171" strokeWidth={2} dot={false} name="Water Stress" />
-                                        <Line type="monotone" dataKey="nitrogen_stress" stroke="#fbbf24" strokeWidth={2} dot={false} name="N Stress" />
-                                        <Line type="monotone" dataKey="disease_severity" stroke="#c084fc" strokeWidth={2} dot={false} name="Disease %" />
+                                        <ReferenceLine y={0.5} stroke="#6b7280" strokeDasharray="4 3" label={{ value: 'Stress threshold', position: 'insideTopRight', fontSize: 10, fill: '#6b7280' }} />
+                                        <Line type="monotone" dataKey="water_stress" stroke="#f87171" strokeWidth={2.5} dot={false} name="Water Stress" />
+                                        <Line type="monotone" dataKey="nitrogen_stress" stroke="#fbbf24" strokeWidth={3} dot={false} name="N Stress" />
+                                        <Line type="monotone" dataKey="disease_severity" stroke="#c084fc" strokeWidth={2.5} dot={false} name="Disease %" />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
@@ -915,12 +1028,46 @@ export default function Simulate() {
                                         <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickFormatter={fmtDate} interval={Math.max(0, Math.ceil((result.daily_data?.length || 1) / 8) - 1)} />
                                         <YAxis stroke="var(--text-muted)" fontSize={11} />
                                         <Tooltip contentStyle={CHART_STYLE} />
-                                        <Area type="monotone" dataKey="avg_temp_c" stroke="#fb923c" fill="rgba(251,146,60,0.15)" strokeWidth={2} dot={false} name="Avg Temp °C" />
+                                        <Area type="monotone" dataKey="avg_temp_c" stroke="#fb923c" fill="rgba(251,146,60,0.15)" strokeWidth={2.5} dot={false} name="Avg Temp °C" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
                     </div>
+
+                    {/* Weather Info Strip */}
+                    {(() => {
+                        const daily = result.daily_data || [];
+                        const peakTemp = daily.length ? Math.max(...daily.map(d => d.avg_temp_c || 0)).toFixed(0) : '—';
+                        const totalRain = daily.length ? daily.reduce((s, d) => s + (d.rainfall_mm || 0), 0).toFixed(0) : '—';
+                        const startD = result.daily_data?.[0]?.date || form.start_date;
+                        const endD   = result.daily_data?.[result.daily_data.length - 1]?.date || '';
+                        const histDays = result.weather_source?.historical_days ?? daily.length;
+                        return (
+                            <div style={{ margin: '20px 0 4px', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                <button
+                                    onClick={() => setWeatherStripOpen(o => !o)}
+                                    style={{
+                                        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                                        padding: '8px 14px', background: 'rgba(255,255,255,0.02)',
+                                        border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem',
+                                    }}
+                                >
+                                    <span style={{ fontSize: '0.75rem', transition: 'transform 0.2s', display: 'inline-block', transform: weatherStripOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
+                                    <span style={{ fontWeight: 600 }}>Weather Data</span>
+                                </button>
+                                {weatherStripOpen && (
+                                    <div style={{ padding: '10px 14px 12px', fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', lineHeight: 1.8 }}>
+                                        📍 {form.latitude.toFixed(1)}°N, {Math.abs(form.longitude).toFixed(1)}°W
+                                        &nbsp;·&nbsp; {fmtDateFull(startD)}{endD ? ` – ${fmtDateFull(endD)}` : ''}
+                                        &nbsp;·&nbsp; 🌦 {histDays} historical days (Open-Meteo ERA5-Land)
+                                        &nbsp;·&nbsp; Peak temp: {peakTemp}°C
+                                        &nbsp;·&nbsp; Total rain: {totalRain} mm
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Triggered Rules with ROI */}
                     {groupedRules.length > 0 && (() => {
@@ -954,6 +1101,42 @@ export default function Simulate() {
                                     {form.field_acres} acres · ${form.treatment_cost_per_acre}/acre treatment cost
                                 </span>
                             </div>
+                            {/* Yield gap callout */}
+                            {(() => {
+                                const currentBu = kgHaToBuAcre(result.final_yield_kg_ha || 0);
+                                const optimumBu = scenario2Result
+                                    ? kgHaToBuAcre(scenario2Result.final_yield_kg_ha || 0)
+                                    : 180;
+                                const optimumLabel = scenario2Result
+                                    ? `${fmtDec(optimumBu, 1)} bu/acre`
+                                    : '~180 bu/acre (central Illinois avg)';
+                                const gap = optimumBu - currentBu;
+                                const commodityPrice = parseFloat(form.commodity_price_usd_bu) || 4.5;
+                                const valueAtRisk = gap * commodityPrice;
+                                return gap > 5 ? (
+                                    <div style={{
+                                        marginBottom: 16, padding: '14px 16px', borderRadius: 10,
+                                        background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.3)',
+                                    }}>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fbbf24', marginBottom: 10 }}>
+                                            ⚠️ Estimated Season Impact
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8, fontSize: '0.8rem' }}>
+                                            {[
+                                                { label: 'Projected yield', value: `${fmtDec(currentBu, 1)} bu/acre`, color: '#f87171' },
+                                                { label: 'Optimum potential', value: optimumLabel, color: '#4ade80' },
+                                                { label: 'Yield gap', value: `${fmtDec(gap, 0)} bu/acre`, color: '#fbbf24' },
+                                                { label: 'Value at risk', value: `$${fmtDec(valueAtRisk, 0)}/acre`, color: '#fbbf24' },
+                                            ].map(m => (
+                                                <div key={m.label} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 3 }}>{m.label}</div>
+                                                    <div style={{ color: m.color, fontWeight: 700 }}>{m.value}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null;
+                            })()}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                 {groupedRules.map((grp, i) => <RuleCard key={i} group={grp} fieldAcres={form.field_acres} treatmentCostPerAcre={form.treatment_cost_per_acre} />)}
                             </div>
@@ -961,13 +1144,47 @@ export default function Simulate() {
                         );
                     })()}
 
-                    {groupedRules.length === 0 && (
-                        <div className="card mt-6" style={{ textAlign: 'center', padding: '32px 24px' }}>
-                            <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>✅</div>
-                            <div style={{ color: 'var(--green-400)', fontWeight: 600, marginBottom: 4 }}>No advisory alerts triggered</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Conditions stayed within acceptable thresholds throughout the simulation.</div>
-                        </div>
-                    )}
+                    {groupedRules.length === 0 && (() => {
+                        const daily = result.daily_data || [];
+                        const avgNStress = daily.length ? daily.reduce((s, d) => s + (d.nitrogen_stress ?? 1), 0) / daily.length : 1;
+                        const avgFAWC   = daily.length ? daily.reduce((s, d) => s + (d.soil_moisture ?? 0.85), 0) / daily.length : 0.85;
+                        const maxDis = result.max_disease_severity ?? 0;
+                        const nLabel     = avgNStress > 0.8 ? 'Adequate' : avgNStress >= 0.5 ? 'Low' : 'Deficient';
+                        const waterLabel = avgFAWC > 0.6 ? 'Sufficient' : avgFAWC >= 0.3 ? 'Moderate Stress' : 'Severe Stress';
+                        const disLabel   = maxDis < 5 ? 'Low Risk' : maxDis < 20 ? 'Moderate' : 'High';
+                        const statusColor = (s) => {
+                            if (['Adequate','Sufficient','Low Risk'].includes(s)) return '#4ade80';
+                            if (['Low','Moderate Stress','Moderate'].includes(s)) return '#fbbf24';
+                            return '#f87171';
+                        };
+                        return (
+                            <div className="card mt-6" style={{ padding: '28px 24px' }}>
+                                <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                                    <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>✅</div>
+                                    <div style={{ color: 'var(--green-400)', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>Field is performing well</div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+                                    {[
+                                        { label: 'N Status', status: nLabel },
+                                        { label: 'Water', status: waterLabel },
+                                        { label: 'Disease', status: disLabel },
+                                    ].map(item => (
+                                        <div key={item.label} style={{
+                                            textAlign: 'center', padding: '14px 10px', borderRadius: 10,
+                                            background: 'rgba(255,255,255,0.02)', border: `1px solid ${statusColor(item.status)}40`,
+                                        }}>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>{item.label}</div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: statusColor(item.status), marginBottom: 4 }}>{item.status}</div>
+                                            <div style={{ color: statusColor(item.status), fontSize: '1.1rem' }}>✓</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ textAlign: 'center', fontSize: '0.83rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    Conditions stayed within acceptable thresholds. Continue current management practices.
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* ACTION BAR */}
                     <div className="action-bar mt-8" data-html2canvas-ignore="true">
