@@ -185,15 +185,16 @@ class TestAgronomicValidation:
 
     def test_yield_formula_correctness(self):
         """
-        Regression guard: final_yield must equal total_biomass × 0.54 when
+        Regression guard: final_yield must equal total_biomass × harvest_index when
         no severe water stress occurs (5mm/day rain-fed, soil stays above threshold).
 
         With the dynamic HI, the formula is:
             yield = total_biomass × hi_dynamic
-        where hi_dynamic = 0.54 when _repro_stress_days == 0 and _grainfill_stress_days == 0.
+        where hi_dynamic equals crop.harvest_index (from template, e.g. corn=0.50)
+        when _repro_stress_days == 0 and _grainfill_stress_days == 0.
 
-        If get_final_yield() ever reverts to using reproductive_biomass or a
-        wrong HI, this test will fail by a large margin.
+        If get_final_yield() ever reverts to using a wrong HI, this test will fail
+        by a large margin (the template-vs-hardcoded gap is ~8%).
         """
         crop = self._run_simulation()
         # Well-watered scenario (5mm/day): no severe water stress expected
@@ -205,10 +206,11 @@ class TestAgronomicValidation:
             f"Unexpected grain-fill stress days: {crop._grainfill_stress_days}."
         )
         computed_yield = crop.get_final_yield()
-        expected_yield = crop.total_biomass_kg_ha * 0.54
+        # Use the model's actual harvest_index (template value, e.g. corn=0.50)
+        expected_yield = crop.total_biomass_kg_ha * crop.harvest_index
         assert abs(computed_yield - expected_yield) < 1e-6, (
             f"get_final_yield() returned {computed_yield:.2f} but "
-            f"total_biomass × 0.54 = {expected_yield:.2f}. "
+            f"total_biomass x harvest_index ({crop.harvest_index}) = {expected_yield:.2f}. "
             f"The yield formula is broken."
         )
 

@@ -90,6 +90,19 @@ class WeatherService:
     4. Synthetic data generation (always available)
     """
 
+    # ── ERA5-Land → gridMET bias correction (Corn Belt, 36–48°N) ─────────────
+    # Monthly multiplicative scaling factors for central Illinois.
+    # Corrects ERA5-Land JJA dry bias vs gridMET (USDA reference).
+    # Source: ERA5 vs PRISM/gridMET evaluation literature.
+    # JJA convective-precip underestimate: 10–30 %.
+    _ILLINOIS_PRECIP_SCALE: Dict[int, float] = {
+        1: 1.00, 2: 1.00, 3: 1.00, 4: 1.05,
+        5: 1.05, 6: 1.15, 7: 1.20, 8: 1.15,
+        9: 1.05, 10: 1.00, 11: 1.00, 12: 1.00,
+    }
+    # Suppress ERA5's spurious sub-threshold drizzle events.
+    _DRIZZLE_THRESHOLD_MM: float = 0.5
+
     def __init__(self, config: Dict[str, Any], project_root: str = ""):
         self.project_root = project_root
         self.config = config
@@ -279,6 +292,7 @@ class WeatherService:
                 f"&daily=temperature_2m_max,temperature_2m_min,"
                 f"temperature_2m_mean,precipitation_sum,"
                 f"windspeed_10m_max,shortwave_radiation_sum"
+                f"&hourly=dewpoint_2m"
                 f"&timezone=auto"
             )
             req = urllib.request.Request(url, headers={"User-Agent": "AgroVisus/1.0"})
@@ -297,6 +311,16 @@ class WeatherService:
             wind_list    = daily.get("windspeed_10m_max", [2.0] * len(times))
             solar_list   = daily.get("shortwave_radiation_sum", [None] * len(times))
 
+            # Build per-date dewpoint lookup from the accompanying hourly block
+            hourly_raw       = raw.get("hourly", {})
+            hourly_times_raw = hourly_raw.get("time", [])
+            hourly_td_raw    = hourly_raw.get("dewpoint_2m", [])
+            td_by_date: Dict[str, List[float]] = {}
+            for j, t_str in enumerate(hourly_times_raw):
+                d_str = t_str[:10]  # "YYYY-MM-DD"
+                if j < len(hourly_td_raw) and hourly_td_raw[j] is not None:
+                    td_by_date.setdefault(d_str, []).append(float(hourly_td_raw[j]))
+
             for i, date_str in enumerate(times):
                 d = date.fromisoformat(date_str)
                 t_max  = t_max_list[i] if i < len(t_max_list) else 25.0
@@ -304,19 +328,45 @@ class WeatherService:
                 t_mean = t_mean_list[i] if (i < len(t_mean_list) and t_mean_list[i] is not None) else (t_max + t_min) / 2.0
                 precip = precip_list[i] or 0.0 if i < len(precip_list) else 0.0
                 wind_max = wind_list[i] or 2.0 if i < len(wind_list) else 2.0
-                wind_avg_ms = (wind_max / 3.6) * 0.6
+                wind_avg_ms = (wind_max / 3.6) * 0.748  # FAO-56 10 m → 2 m
                 solar = solar_list[i] if (i < len(solar_list) and solar_list[i] is not None) else self._estimate_solar_radiation(lat, d, 60.0)
-                diurnal_range = max(1, t_max - t_min)
-                est_humidity = max(30.0, min(95.0, 85.0 - diurnal_range * 1.5))
+                # FAO-56 Eq. 12: es = (e°(Tmax) + e°(Tmin)) / 2
+                es_tmax_d = 0.6108 * np.exp(17.27 * t_max / (t_max + 237.3))
+                es_tmin_d = 0.6108 * np.exp(17.27 * t_min / (t_min + 237.3))
+                es_d      = (es_tmax_d + es_tmin_d) / 2.0
+
+                td_vals = td_by_date.get(date_str, [])
+                if td_vals:
+                    td_mean_d  = sum(td_vals) / len(td_vals)
+                    td_max_d   = max(td_vals)
+                    ea_d       = self._dewpoint_to_ea(td_mean_d)
+                    rh_d       = max(0.0, min(100.0, 100.0 * ea_d / es_d)) if es_d > 0 else 60.0
+                    ea_max_d   = self._dewpoint_to_ea(td_max_d)
+                    rh_max_d   = min(100.0, 100.0 * ea_max_d / es_tmin_d) if es_tmin_d > 0 else rh_d
+                    dewpoint_d = round(td_mean_d, 2)
+                    ea_kpa_d   = round(ea_d, 4)
+                else:
+                    diurnal_range = max(1, t_max - t_min)
+                    rh_d       = max(30.0, min(95.0, 85.0 - diurnal_range * 1.5))
+                    rh_max_d   = min(100.0, rh_d + 15.0)
+                    ea_kpa_d   = round((rh_d / 100.0) * es_d, 4)
+                    dewpoint_d = None
+
+                # Precipitation bias correction
+                precip_raw_d      = float(precip)
+                precip_corrected_d = self._bias_correct_precip(precip_raw_d, d.month, lat)
                 self._openmeteo_daily_cache[d] = {
-                    "total_precip_mm":        round(float(precip), 2),
-                    "avg_temp_c":             round(float(t_mean), 2),
-                    "min_temp_c":             round(float(t_min),  2),
-                    "max_temp_c":             round(float(t_max),  2),
-                    "avg_humidity":           round(est_humidity,  2),
-                    "max_humidity_percent":   round(min(100.0, est_humidity + 15.0), 2),
-                    "avg_wind_speed_m_s":     round(wind_avg_ms,  2),
-                    "total_solar_rad_mj_m2":  round(float(solar), 2),
+                    "total_precip_mm":        round(precip_corrected_d,   2),
+                    "avg_temp_c":             round(float(t_mean),        2),
+                    "min_temp_c":             round(float(t_min),         2),
+                    "max_temp_c":             round(float(t_max),         2),
+                    "avg_humidity":           round(rh_d,                 2),
+                    "max_humidity_percent":   round(rh_max_d,             2),
+                    "avg_wind_speed_m_s":     round(wind_avg_ms,          2),
+                    "total_solar_rad_mj_m2":  round(float(solar),         2),
+                    "dewpoint_c":             dewpoint_d,
+                    "ea_kpa":                 ea_kpa_d,
+                    "precip_bias_corrected":  precip_corrected_d != precip_raw_d,
                 }
 
             logger.info(
@@ -675,6 +725,7 @@ class WeatherService:
                 f"&daily=temperature_2m_max,temperature_2m_min,"
                 f"temperature_2m_mean,precipitation_sum,"
                 f"windspeed_10m_max,shortwave_radiation_sum"
+                f"&hourly=dewpoint_2m"
                 f"&timezone=auto"
             )
 
@@ -696,26 +747,57 @@ class WeatherService:
 
             precip = daily.get("precipitation_sum", [0])[0] or 0.0
             wind_max = daily.get("windspeed_10m_max", [2.0])[0] or 2.0
-            # Convert km/h to m/s, and use ~60% of max as daily average
-            wind_avg_ms = (wind_max / 3.6) * 0.6
+            # Convert km/h to m/s; FAO-56 10 m → 2 m height correction factor 0.748
+            wind_avg_ms = (wind_max / 3.6) * 0.748
 
             solar = daily.get("shortwave_radiation_sum", [None])[0]
             if solar is None:
                 solar = self._estimate_solar_radiation(lat, target_date, 60.0)
 
-            # Estimate humidity from temperature range (simple proxy)
-            diurnal_range = max(1, t_max - t_min)
-            est_humidity = max(30, min(95, 85 - diurnal_range * 1.5))
+            # Derive RH from hourly dewpoint (actual measurement, Magnus formula)
+            # FAO-56 Eq. 12: es = (e°(Tmax) + e°(Tmin)) / 2
+            es_tmax = 0.6108 * np.exp(17.27 * t_max / (t_max + 237.3))
+            es_tmin = 0.6108 * np.exp(17.27 * t_min / (t_min + 237.3))
+            es = (es_tmax + es_tmin) / 2.0
+
+            hourly_raw = raw.get("hourly", {})
+            td_values = [v for v in hourly_raw.get("dewpoint_2m", []) if v is not None]
+            if td_values:
+                td_mean    = sum(td_values) / len(td_values)
+                td_max_val = max(td_values)
+                ea         = self._dewpoint_to_ea(td_mean)
+                rh_avg     = max(0.0, min(100.0, 100.0 * ea / es)) if es > 0 else 60.0
+                ea_max     = self._dewpoint_to_ea(td_max_val)
+                es_min     = es_tmin
+                rh_max     = min(100.0, 100.0 * ea_max / es_min) if es_min > 0 else rh_avg
+                dewpoint_c = round(td_mean, 2)
+                ea_kpa     = round(ea, 4)
+            else:
+                # Fallback: diurnal-range proxy when hourly dewpoint unavailable
+                diurnal_range = max(1, t_max - t_min)
+                rh_avg     = max(30.0, min(95.0, 85.0 - diurnal_range * 1.5))
+                rh_max     = min(100.0, rh_avg + 15.0)
+                ea         = (rh_avg / 100.0) * es
+                dewpoint_c = None
+                ea_kpa     = round(ea, 4)
+
+            # Precipitation bias correction (ERA5-Land Corn Belt dry bias)
+            precip_raw       = precip
+            precip           = self._bias_correct_precip(precip, target_date.month, lat)
+            precip_corrected = precip != precip_raw
 
             result = {
                 "total_precip_mm": round(precip, 2),
                 "avg_temp_c": round(t_mean, 2),
                 "min_temp_c": round(t_min, 2),
                 "max_temp_c": round(t_max, 2),
-                "avg_humidity": round(est_humidity, 2),
-                "max_humidity_percent": round(min(100, est_humidity + 15), 2),
+                "avg_humidity": round(rh_avg, 2),
+                "max_humidity_percent": round(rh_max, 2),
                 "avg_wind_speed_m_s": round(wind_avg_ms, 2),
                 "total_solar_rad_mj_m2": round(solar, 2),
+                "dewpoint_c": dewpoint_c,
+                "ea_kpa": ea_kpa,
+                "precip_bias_corrected": precip_corrected,
             }
 
             # Cache
@@ -922,3 +1004,22 @@ class WeatherService:
         cloud_factor = max(0.25, min(0.55, 0.875 - 0.005 * humidity))
 
         return max(0, Ra * cloud_factor)
+
+    def _dewpoint_to_ea(self, td_c: float) -> float:
+        """Actual vapour pressure from dewpoint temperature (kPa). FAO-56 Eq. 14."""
+        return 0.6108 * np.exp(17.27 * td_c / (td_c + 237.3))
+
+    def _bias_correct_precip(
+        self, precip_mm: float, month: int, lat: float
+    ) -> float:
+        """
+        Apply monthly multiplicative bias correction to ERA5-Land precipitation
+        for Corn Belt fields (36–48°N).
+
+        Suppresses drizzle events below _DRIZZLE_THRESHOLD_MM.
+        Returns precip_mm unchanged for locations outside the Corn Belt.
+        """
+        if not (36 <= lat <= 48):
+            return precip_mm
+        corrected = precip_mm * self._ILLINOIS_PRECIP_SCALE.get(month, 1.0)
+        return 0.0 if corrected < self._DRIZZLE_THRESHOLD_MM else corrected

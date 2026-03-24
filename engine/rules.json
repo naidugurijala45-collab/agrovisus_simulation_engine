@@ -55,6 +55,21 @@
       }
     },
     {
+      "id": "N_Deficiency_Severe",
+      "name": "Severe Nitrogen Deficiency",
+      "conditions": [
+        { "path": "nutrients.nitrogen_nutrition_index", "operator": "less_than", "threshold": 0.5 },
+        { "path": "nutrients.available_N_kg_ha", "operator": "less_than", "threshold": 30.0 },
+        { "path": "crop.current_stage", "operator": "not_in", "threshold": ["VE", "V2", "R6"] }
+      ],
+      "result": {
+        "severity": "High",
+        "alert_type": "Nutrient Stress",
+        "yield_impact_percent": 25.0,
+        "recommendation": "NNI below 0.5 — crop is severely nitrogen-deficient. Immediate top-dress application is critical. Yield losses of 25%+ expected without intervention."
+      }
+    },
+    {
       "id": "Nitrogen_Deficiency",
       "name": "Nitrogen Deficiency Warning",
       "conditions": [

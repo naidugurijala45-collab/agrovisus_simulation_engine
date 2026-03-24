@@ -26,6 +26,8 @@ class ReportingService:
         daily_irrigation_mm,
         daily_fertilization_events,
         triggered_rules_for_day,
+        actual_eta_mm: float = 0.0,
+        kc_used: float = 0.0,
     ):
         """
         Collects all relevant daily data from the models for reporting.
@@ -57,7 +59,8 @@ class ReportingService:
             "crop_nitrogen_demand_kg_ha": self.crop_model.get_daily_n_demand(),
             # Soil Model Data
             "fraction_awc": self.soil_model.get_soil_moisture_status()["fraction_awc"],
-            "daily_etc_mm": 0.0,  # Not directly tracked; calculated in update_daily
+            "daily_etc_mm": actual_eta_mm,
+            "kc_used": kc_used,
             "daily_percolation_mm": 0.0,  # Returned from update_daily, not stored
             "daily_runoff_mm": 0.0,  # Returned from update_daily, not stored
             # Management Data (passed in or queried from a management_schedule object)

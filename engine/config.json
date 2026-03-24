@@ -8,13 +8,13 @@
   },
   "rule_path": "rules.json",
   "soil_parameters": {
-    "type": "Generic Silt Loam Soil Profile",
-    "field_capacity_mm": 100.0,
-    "wilting_point_mm": 48.0,
+    "type": "Illinois Silt Loam (FAO-56 / ISWS)",
+    "field_capacity_mm": 360.0,
+    "wilting_point_mm": 168.0,
     "saturation_volumetric": 0.45
   },
   "simulation_inputs": {
-    "assumed_root_zone_depth_mm": 400.0
+    "assumed_root_zone_depth_mm": 1200.0
   },
   "historical_data_paths": {
     "hourly_weather_csv": "data/hourly_weather.csv"

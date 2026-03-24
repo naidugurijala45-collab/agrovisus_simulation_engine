@@ -28,7 +28,7 @@ _CSV_HEADERS = [
     "daily_solar_radiation_mj_m2", "daily_avg_humidity_percent", "daily_et0_mm",
     "gdd_accumulated", "crop_growth_stage", "total_biomass_kg_ha", "leaf_area_index",
     "crop_nitrogen_demand_kg_ha",
-    "fraction_awc", "daily_etc_mm", "daily_percolation_mm", "daily_runoff_mm",
+    "fraction_awc", "daily_etc_mm", "kc_used", "daily_percolation_mm", "daily_runoff_mm",
     "daily_irrigation_mm", "daily_fertilization_kg_ha",
     "soil_urea_kg_ha", "soil_ammonium_kg_ha", "soil_nitrate_kg_ha",
     "crop_nitrogen_uptake_kg_ha", "nitrogen_daily_leaching_kg_ha",

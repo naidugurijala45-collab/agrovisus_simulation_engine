@@ -100,7 +100,6 @@ class CropModel:
         # ── RUE (Beer-Lambert) params ───────────────────────────────────────
         _default_stress = {
             "water_moderate": 0.85, "water_severe": 0.60,
-            "n_moderate": 0.80, "n_severe": 0.65,
         }
         self._has_rue_config = rue_config is not None
         if rue_config:
@@ -142,6 +141,26 @@ class CropModel:
             return False
         return self.stage_order.index(current) >= self.stage_order.index(target)
 
+    def _nni_to_stress_factor(self, nni: float) -> float:
+        """Continuous N-stress: APSIM nfact_photo mapped to [0.35, 1.0].
+
+        Pure APSIM: max(0, (nni - 0.4) / 0.6)
+        Our NNI model produces 0.1-0.25 under severe deficiency (limited root
+        uptake early season), where pure APSIM gives 0. The 0.35 floor is a
+        biological minimum — severely stressed crops still accumulate some biomass.
+
+        Key values:
+            NNI >= 1.0 → 1.00  (no stress)
+            NNI =  0.7 → 0.70
+            NNI =  0.5 → 0.50
+            NNI <= 0.4 → 0.40  (floor: severe but not complete suppression)
+        """
+        if nni >= 1.0:
+            return 1.0
+        if nni <= 0.4:
+            return 0.40
+        return 0.40 + (nni - 0.4) / 0.6 * 0.60
+
     def _compute_apar(self, solar_radiation_mj: float, lai: float) -> float:
         """Absorbed PAR via Beer-Lambert: APAR = I₀ · k · (1 − e^{−k · LAI})"""
         return solar_radiation_mj * self.k_ext * (1.0 - math.exp(-self.k_ext * lai))
@@ -167,13 +186,8 @@ class CropModel:
         else:
             w_factor = self.rue_stress["water_severe"]
 
-        # N stress multiplier (NNI-based)
-        if nni >= 0.9:
-            n_factor = 1.0
-        elif nni >= 0.7:
-            n_factor = self.rue_stress["n_moderate"]
-        else:
-            n_factor = self.rue_stress["n_severe"]
+        # N stress multiplier (continuous APSIM-style linear)
+        n_factor = self._nni_to_stress_factor(nni)
 
         return rue_base * w_factor * n_factor, rue_base
 
@@ -311,7 +325,7 @@ class CropModel:
         Stress has already been applied daily to biomass accumulation; HI here
         separates grain from total crop mass without double-counting stress.
         """
-        hi = 0.54
+        hi = self.harvest_index  # from template (corn=0.50, wheat=0.40, …)
         if self._repro_stress_days > 0:
             # Max −35% for full pollination failure (≥20 severe-stress days at VT/R1).
             # Djaman: rainfed HI ~0.49 vs irrigated ~0.57 → ~14% typical seasonal drop.

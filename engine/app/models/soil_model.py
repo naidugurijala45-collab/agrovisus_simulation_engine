@@ -95,19 +95,29 @@ class SoilModel:
         # Layer 3: Deep (60-150cm) - Deep storage
         
         self.layers: List[SoilLayer] = []
-        
-        # L1
-        l1_depth = 150.0
+
+        # Depth-proportional three-layer geometry so that the profile always
+        # sums exactly to soil_depth_mm, regardless of requested depth.
+        #   L1 (surface / evaporation zone): top 25%, capped at 300 mm
+        #   L2 (main root zone):             next 50%, capped at 600 mm
+        #   L3 (deep storage):               remainder
+        l1_depth = min(300.0, soil_depth_mm * 0.25)
+        l2_depth = min(600.0, soil_depth_mm * 0.50)
+        l3_depth = max(0.0, soil_depth_mm - l1_depth - l2_depth)
+
         self.layers.append(SoilLayer(l1_depth, custom_soil_params))
-        
-        # L2
-        l2_depth = 450.0 # Ends at 600mm
         self.layers.append(SoilLayer(l2_depth, custom_soil_params))
-        
-        # L3
-        l3_depth = max(0.0, soil_depth_mm - 600.0)
         if l3_depth > 0:
             self.layers.append(SoilLayer(l3_depth, custom_soil_params))
+
+        # PAW sanity check for field-scale profiles (>= 800 mm)
+        total_paw_mm = sum(l.awc_mm for l in self.layers)
+        if soil_depth_mm >= 800:
+            assert 150 < total_paw_mm < 400, (
+                f"PAW {total_paw_mm:.1f} mm outside expected 150–400 mm for a "
+                f"{soil_depth_mm:.0f} mm soil profile. "
+                f"Check field_capacity_mm and wilting_point_mm in config."
+            )
             
         # Initialize Moisture
         for layer in self.layers:
@@ -285,6 +295,19 @@ class SoilModel:
             "deep_percolation_mm": self.deep_percolation_mm,
         }
 
+    def get_wfps(self) -> float:
+        """
+        Water-filled pore space (0–1).
+
+        WFPS = current volumetric water / saturation pore volume
+             = sum(layer.current_water_mm) / sum(layer.water_at_sat_mm)
+
+        Saturated when WFPS ≥ 0.90 (anaerobic threshold for BNF suppression).
+        """
+        total_water = sum(l.current_water_mm for l in self.layers)
+        total_sat   = sum(l.water_at_sat_mm   for l in self.layers)
+        return min(1.0, total_water / total_sat) if total_sat > 0 else 0.0
+
     def get_soil_moisture_status(self) -> Dict[str, Any]:
         """
         Returns status. Includes aggregate for validation and per-layer for detail.
@@ -292,11 +315,15 @@ class SoilModel:
         total_water = sum(l.current_water_mm for l in self.layers)
         total_fc = sum(l.water_at_fc_mm for l in self.layers)
         total_wp = sum(l.water_at_wp_mm for l in self.layers)
+        total_sat = sum(l.water_at_sat_mm for l in self.layers)
         total_awc = total_fc - total_wp
-        
+
         avail = max(0.0, total_water - total_wp)
         fraction_awc = avail / total_awc if total_awc > 0 else 0.0
         fraction_awc = min(1.0, fraction_awc)
+
+        # Water-filled pore space: current water / pore volume at saturation
+        wfps = round(min(1.0, total_water / total_sat), 3) if total_sat > 0 else 0.0
         
         # Status Category
         if fraction_awc >= 0.75: status = "Wet"
@@ -311,8 +338,9 @@ class SoilModel:
 
         return {
             "current_water_mm": round(total_water, 2),
-            "fraction_awc": round(fraction_awc, 3), # Weighted average of whole profile
+            "fraction_awc": round(fraction_awc, 3),
+            "wfps": wfps,
             "status_category": status,
             "deep_percolation_mm": round(self.deep_percolation_mm, 2),
-            **layer_details # Merge L1, L2 stats
+            **layer_details,
         }

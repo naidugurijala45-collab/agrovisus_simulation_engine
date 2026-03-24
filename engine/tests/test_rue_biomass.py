@@ -1,10 +1,11 @@
 """Regression tests for RUE-driven daily biomass accumulation (Beer-Lambert).
 
 Covers:
-  - test_rue_corn_no_stress          : delta_biomass in expected range under no stress
+  - test_rue_corn_no_stress             : delta_biomass in expected range under no stress
   - test_rue_corn_water_stress_moderate : moderate water stress reduces RUE by 0.85x
-  - test_rue_rice_stage_switch       : vegetative→grain-fill RUE switch at PanicleInitiation
-  - test_rue_soybean_n_stress_severe : severe N stress (NNI=0.5) reduces RUE by 0.65x
+  - test_rue_rice_stage_switch          : vegetative→grain-fill RUE switch at PanicleInitiation
+  - test_rue_soybean_n_stress_severe    : severe N stress (NNI=0.5) → APSIM linear factor
+  - test_nni_stress_continuous          : five boundary checks for _nni_to_stress_factor
 """
 
 import pytest
@@ -14,8 +15,6 @@ from app.models.crop_model import CropModel
 _STRESS = {
     "water_moderate": 0.85,
     "water_severe":   0.60,
-    "n_moderate":     0.80,
-    "n_severe":       0.65,
 }
 
 
@@ -167,11 +166,35 @@ def test_rue_rice_stage_switch():
 
 
 def test_rue_soybean_n_stress_severe():
-    """Soybean with NNI=0.5 (< 0.7) → n_factor=0.65 → RUE_effective = 2.5 * 0.65."""
+    """Soybean with NNI=0.5 → APSIM linear: 0.40 + (0.5-0.4)/0.6 * 0.60 = 0.50."""
     model = _soybean_model()
     model.current_stage = "V6"
+
+    expected_n_factor = 0.40 + (0.5 - 0.4) / 0.6 * 0.60  # = 0.50
 
     rue_eff, _ = model._compute_rue_effective(
         "V6", soil_water_factor=1.0, nni=0.5
     )
-    assert rue_eff == pytest.approx(2.5 * 0.65, rel=1e-6)
+    assert rue_eff == pytest.approx(2.5 * expected_n_factor, rel=1e-4)
+
+
+def test_nni_stress_continuous():
+    """_nni_to_stress_factor: boundary checks for the APSIM-mapped function (floor=0.40)."""
+    model = _corn_model()
+
+    # NNI >= 1.0 → no stress
+    assert model._nni_to_stress_factor(1.0) == pytest.approx(1.0)
+    assert model._nni_to_stress_factor(1.3) == pytest.approx(1.0)
+
+    # NNI at floor boundary (0.4) → 0.40
+    assert model._nni_to_stress_factor(0.4) == pytest.approx(0.40)
+
+    # NNI below floor → 0.40
+    assert model._nni_to_stress_factor(0.15) == pytest.approx(0.40)
+    assert model._nni_to_stress_factor(0.0) == pytest.approx(0.40)
+
+    # NNI = 0.7 → 0.40 + (0.7-0.4)/0.6 * 0.60 = 0.40 + 0.30 = 0.70
+    assert model._nni_to_stress_factor(0.7) == pytest.approx(0.70, rel=1e-4)
+
+    # NNI = 0.9 → 0.40 + (0.9-0.4)/0.6 * 0.60 = 0.40 + 0.50 = 0.90
+    assert model._nni_to_stress_factor(0.9) == pytest.approx(0.90, rel=1e-3)

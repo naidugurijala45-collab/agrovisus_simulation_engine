@@ -261,5 +261,235 @@ class TestSolarRadiation:
         assert dry > humid
 
 
+# ── Wind Height Correction ────────────────────────────────────
+
+
+class TestWindHeightCorrection:
+    def test_wind_conversion_formula(self, basic_config):
+        """36 km/h at 10 m → 7.48 m/s at 2 m (FAO-56 Eq. 47)."""
+        wind_max_kmh = 36.0
+        u2 = (wind_max_kmh / 3.6) * 0.748
+        assert abs(u2 - 7.48) < 0.01
+
+    def test_open_meteo_wind_uses_fao56(self, basic_config):
+        """Mock Open-Meteo response: verify output wind speed uses 0.748 factor."""
+        import json
+        from unittest.mock import patch, MagicMock
+
+        mock_body = json.dumps({
+            "daily": {
+                "time": ["2023-06-15"],
+                "temperature_2m_max": [28.0],
+                "temperature_2m_min": [18.0],
+                "temperature_2m_mean": [23.0],
+                "precipitation_sum": [2.0],
+                "windspeed_10m_max": [36.0],       # km/h
+                "shortwave_radiation_sum": [22.0],
+            },
+            "hourly": {
+                "time": ["2023-06-15T12:00"],
+                "dewpoint_2m": [15.0],
+            },
+        }).encode()
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = mock_body
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        ws = WeatherService(basic_config)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            data = ws._fetch_from_open_meteo(40.0, -88.0, date(2023, 6, 15))
+
+        assert data is not None
+        expected_u2 = (36.0 / 3.6) * 0.748
+        assert abs(data["avg_wind_speed_m_s"] - expected_u2) < 0.01
+
+
+# ── Dewpoint → Humidity (Magnus / FAO-56) ─────────────────────
+
+
+class TestDewpointHumidity:
+    def test_dewpoint_to_ea(self, basic_config):
+        """ea from 15 °C dewpoint = 1.705 kPa (FAO-56 Eq. 14)."""
+        ws = WeatherService(basic_config)
+        ea = ws._dewpoint_to_ea(15.0)
+        assert abs(ea - 1.705) < 0.005
+
+    def test_rh_derived_from_dewpoint(self, basic_config):
+        """Td=15°C, Tmax=28°C, Tmin=18°C → RH ≈ 58 % (within 55–65)."""
+        import json
+        from unittest.mock import patch, MagicMock
+
+        mock_body = json.dumps({
+            "daily": {
+                "time": ["2023-06-15"],
+                "temperature_2m_max": [28.0],
+                "temperature_2m_min": [18.0],
+                "temperature_2m_mean": [23.0],
+                "precipitation_sum": [0.0],
+                "windspeed_10m_max": [10.0],
+                "shortwave_radiation_sum": [22.0],
+            },
+            "hourly": {
+                "time": [f"2023-06-15T{h:02d}:00" for h in range(24)],
+                "dewpoint_2m": [15.0] * 24,
+            },
+        }).encode()
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = mock_body
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        ws = WeatherService(basic_config)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            data = ws._fetch_from_open_meteo(40.0, -88.0, date(2023, 6, 15))
+
+        assert data is not None
+        assert 55 <= data["avg_humidity"] <= 65, (
+            f"Expected RH 55–65 %, got {data['avg_humidity']}"
+        )
+        assert data["dewpoint_c"] == 15.0
+        assert data["ea_kpa"] is not None
+
+    def test_humidity_fallback_when_no_dewpoint(self, basic_config):
+        """When dewpoint_2m is absent, humidity falls back to diurnal-range estimate."""
+        import json
+        from unittest.mock import patch, MagicMock
+
+        mock_body = json.dumps({
+            "daily": {
+                "time": ["2023-06-15"],
+                "temperature_2m_max": [30.0],
+                "temperature_2m_min": [15.0],
+                "temperature_2m_mean": [22.0],
+                "precipitation_sum": [0.0],
+                "windspeed_10m_max": [10.0],
+                "shortwave_radiation_sum": [22.0],
+            },
+            "hourly": {"time": [], "dewpoint_2m": []},
+        }).encode()
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = mock_body
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+
+        ws = WeatherService(basic_config)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            data = ws._fetch_from_open_meteo(40.0, -88.0, date(2023, 6, 15))
+
+        assert data is not None
+        assert data["dewpoint_c"] is None
+        assert 30 <= data["avg_humidity"] <= 95
+
+
+# ── Disease Step Hourly Wiring ────────────────────────────────
+
+
+class TestDiseaseStepHourlyWiring:
+    def test_lwd_nonzero_with_rainy_hourly(self, basic_config):
+        """Synthetic hourly records from a rainy day produce lwd_hours > 0."""
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from app.utils.leaf_wetness_model import calculate_leaf_wetness_duration
+
+        ws = WeatherService(basic_config)
+        rainy_day = {
+            "total_precip_mm": 12.0,
+            "avg_temp_c": 20.0,
+            "min_temp_c": 15.0,
+            "max_temp_c": 25.0,
+            "avg_humidity": 80.0,
+            "avg_wind_speed_m_s": 2.0,
+            "total_solar_rad_mj_m2": 15.0,
+        }
+        hourly = ws._daily_to_synthetic_hourly(rainy_day, date(2024, 7, 15))
+        assert len(hourly) == 24
+        assert all("humidity" in h and "precip_mm" in h for h in hourly)
+
+        # 12 mm daily rain distributed randomly → at least one hour exceeds 0.1 mm
+        # Use a liberal threshold: run 5 independent samples, at least one must pass
+        any_wet = False
+        for _ in range(5):
+            hourly_i = ws._daily_to_synthetic_hourly(rainy_day, date(2024, 7, 15))
+            if calculate_leaf_wetness_duration(hourly_i) > 0:
+                any_wet = True
+                break
+        assert any_wet, "Expected at least one rainy-day sample to have lwd > 0"
+
+
+# ── WFPS ─────────────────────────────────────────────────────
+
+
+class TestWFPS:
+    def _make_soil(self, moisture_fraction: float):
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from app.models.soil_model import SoilModel
+        return SoilModel(
+            "SiltLoam", soil_depth_mm=600.0,
+            initial_moisture_fraction_awc=moisture_fraction,
+        )
+
+    def test_wfps_at_saturation(self):
+        """All layers at saturation → WFPS = 1.0 ≥ 0.95."""
+        soil = self._make_soil(0.5)
+        for layer in soil.layers:
+            layer.current_water_mm = layer.water_at_sat_mm
+        assert soil.get_wfps() >= 0.95
+
+    def test_wfps_at_wilting_point(self):
+        """All layers at WP → WFPS = WP_vol / SAT_vol < 0.35."""
+        soil = self._make_soil(0.5)
+        for layer in soil.layers:
+            layer.current_water_mm = layer.water_at_wp_mm
+        assert soil.get_wfps() < 0.35
+
+    def test_wfps_in_status_dict(self):
+        """get_soil_moisture_status() includes consistent wfps key."""
+        soil = self._make_soil(0.5)
+        status = soil.get_soil_moisture_status()
+        assert "wfps" in status
+        assert 0.0 <= status["wfps"] <= 1.0
+
+    def test_wfps_increases_with_moisture(self):
+        """Wetter soil → higher WFPS than drier soil."""
+        dry  = self._make_soil(0.1)
+        wet  = self._make_soil(0.9)
+        assert wet.get_wfps() > dry.get_wfps()
+
+
+# ── Precipitation Bias Correction ────────────────────────────
+
+
+class TestPrecipBiasCorrection:
+    def test_july_illinois_scaled(self, basic_config):
+        """July, lat 40°N: 5.0 mm × 1.20 = 6.0 mm."""
+        ws = WeatherService(basic_config)
+        result = ws._bias_correct_precip(5.0, month=7, lat=40.0)
+        assert abs(result - 6.0) < 0.01
+
+    def test_drizzle_suppressed(self, basic_config):
+        """0.3 mm after scaling is below drizzle threshold → 0.0 mm."""
+        ws = WeatherService(basic_config)
+        # 0.3 mm × 1.20 = 0.36 mm < 0.5 mm threshold
+        result = ws._bias_correct_precip(0.3, month=7, lat=40.0)
+        assert result == 0.0
+
+    def test_outside_corn_belt_unchanged(self, basic_config):
+        """Latitude outside 36–48°N → no correction applied."""
+        ws = WeatherService(basic_config)
+        assert ws._bias_correct_precip(5.0, month=7, lat=30.0) == 5.0
+        assert ws._bias_correct_precip(5.0, month=7, lat=55.0) == 5.0
+
+    def test_winter_month_no_scaling(self, basic_config):
+        """January scale factor = 1.00 → value unchanged above threshold."""
+        ws = WeatherService(basic_config)
+        result = ws._bias_correct_precip(5.0, month=1, lat=40.0)
+        assert abs(result - 5.0) < 0.01
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

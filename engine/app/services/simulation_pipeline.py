@@ -39,7 +39,66 @@ if TYPE_CHECKING:
 
 from app.utils.leaf_wetness_model import calculate_leaf_wetness_duration
 
+import math as _math
+
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Soil temperature (25 cm) — damped sinusoidal model
+# ---------------------------------------------------------------------------
+
+def estimate_soil_temp_25cm(
+    doy: int,
+    tair_mean: float,
+    t_mean_annual: float = 12.0,
+    amplitude: float = 12.0,
+    phase_lag_days: int = 48,
+) -> float:
+    """Estimate daily soil temperature at 25 cm depth (°C).
+
+    Uses a damped sinusoid (Parton 1984 / DSSAT CERES approach):
+        T_soil = T_mean_ann + A * exp(-z/d) * sin(omega*(doy - t0) - z/d)
+                + alpha * (T_air - T_seasonal)
+
+    Simplified to two terms relevant at 25 cm for temperate mid-latitude sites:
+        T_soil ≈ T_mean_ann + A_eff * sin(2π/365 * (doy - phase_peak))
+                + alpha * (tair_mean - T_seasonal)
+
+    Default parameters are calibrated for Illinois silt loam at 40 °N:
+        - t_mean_annual = 12.0 °C  (30-yr NOAA normal Champaign IL)
+        - amplitude     = 12.0 °C  (surface amplitude damped ~75 % at 25 cm)
+        - phase_lag     = 48 days  (peak surface DOY 172 → peak 25 cm DOY 220)
+        - alpha         = 0.20     (daily air-temp coupling)
+
+    The seasonal component uses a cosine so the maximum falls exactly on
+    peak_soil_doy (cos(0) = 1):
+        T_seasonal = T_mean_ann + A * cos(2π/365 * (doy − peak_soil_doy))
+
+    Args:
+        doy:            Day of year (1-365).
+        tair_mean:      Today's mean air temperature (°C).
+        t_mean_annual:  Long-term mean annual air temperature at site (°C).
+        amplitude:      Effective soil-temperature amplitude at 25 cm (°C).
+        phase_lag_days: Days from surface peak (DOY 172) to 25 cm peak.
+                        Default 48 places the 25 cm peak at DOY 220 (early Aug).
+
+    Returns:
+        Estimated soil temperature at 25 cm (°C), clamped to [−5, 40].
+    """
+    alpha = 0.20
+    peak_surface_doy = 172          # summer solstice
+    peak_soil_doy = peak_surface_doy + phase_lag_days  # DOY 172+48=220
+
+    # Seasonal (long-wave) component — cosine peaks exactly at peak_soil_doy
+    t_seasonal = t_mean_annual + amplitude * _math.cos(
+        2 * _math.pi / 365 * (doy - peak_soil_doy)
+    )
+
+    # Short-term air-T coupling
+    t_soil = t_seasonal + alpha * (tair_mean - t_seasonal)
+
+    return max(-5.0, min(40.0, t_soil))
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +128,7 @@ class DayState:
 
     # ── Soil ────────────────────────────────────────────────────────────────
     deep_percolation_mm: float = 0.0
+    actual_eta_mm: float = 0.0      # actual evapotranspiration extracted from soil
     soil_status: Dict[str, Any] = field(default_factory=dict)
 
     # ── Pre-update crop state (captured before CropModel.update_daily) ──────
@@ -165,6 +225,8 @@ class WeatherStep(_Step):
         state.avg_humidity_pct = wx.get("avg_humidity", 70.0)
         state.solar_rad_mj_m2 = wx.get("total_solar_rad_mj_m2", 20.0)
         state.wind_speed_ms = wx.get("avg_wind_speed_m_s", 2.0)
+        # Measured actual vapour pressure from dewpoint (may be None if fallback used)
+        ea_kpa = wx.get("ea_kpa")
 
         state.et0_mm = svc.et0_service.calculate_et0(
             weather_data={
@@ -172,6 +234,7 @@ class WeatherStep(_Step):
                 "t_max": state.max_temp_c,
                 "t_avg": state.avg_temp_c,
                 "rh_avg": state.avg_humidity_pct,
+                "ea_kpa": ea_kpa,
                 "rs_mj_m2": state.solar_rad_mj_m2,
                 "u2_m_s": state.wind_speed_ms,
             },
@@ -207,6 +270,7 @@ class SoilStep(_Step):
             root_depth_mm=root_depth,
         )
         state.deep_percolation_mm = soil_updates["deep_percolation_mm"]
+        state.actual_eta_mm = soil_updates.get("actual_eta_mm", 0.0)
         state.soil_status = svc.soil_model.get_soil_moisture_status()
 
 
@@ -236,9 +300,12 @@ class NutrientStep(_Step):
             state.avg_temp_c,
             state.soil_status,
             root_dm_g_m2=root_dm_g_m2,
-            soil_temp_25cm=state.avg_temp_c,   # surface air T as soil-T proxy
+            soil_temp_25cm=estimate_soil_temp_25cm(
+                doy=state.sim_date.timetuple().tm_yday,
+                tair_mean=state.avg_temp_c,
+            ),
             nds=nds,
-            wfps=None,                          # WFPS not currently tracked in SoilModel
+            wfps=state.soil_status.get("wfps"),
         )
 
         biomass_Mg_ha = svc.crop_model.total_biomass_kg_ha / 1000.0
@@ -270,8 +337,10 @@ class DiseaseStep(_Step):
             state.crop_status_pre["nitrogen_stress_factor"],
             state.crop_status_pre["water_stress_factor"],
         )
-        hourly_df = svc.data_manager.get_hourly_data_for_simulation_day(state.sim_date)
-        hourly_list = hourly_df.to_dict("records") if hourly_df is not None else []
+        lat = svc._safe_float(svc.sim_settings_conf.get("latitude_degrees", 40.0))
+        lon = svc._safe_float(svc.sim_settings_conf.get("longitude_degrees", 0.0))
+        hourly_records = svc.weather_service.get_hourly_weather(lat, lon, state.sim_date)
+        hourly_list = hourly_records if hourly_records is not None else []
         state.lwd_hours = (
             calculate_leaf_wetness_duration(hourly_list) if hourly_list else 0.0
         )
@@ -388,6 +457,8 @@ class ReportingStep(_Step):
             daily_irrigation_mm=state.irrigation_mm,
             daily_fertilization_events=state.fertilization_events,
             triggered_rules_for_day=state.triggered_rules,
+            actual_eta_mm=state.actual_eta_mm,
+            kc_used=state.kc_today,
         )
 
 

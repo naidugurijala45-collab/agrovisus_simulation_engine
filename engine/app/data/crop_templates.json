@@ -264,9 +264,7 @@
             "source": "Lindquist et al. 2005, Agron J 97:72-78",
             "stress": {
                 "water_moderate": 0.85,
-                "water_severe": 0.6,
-                "n_moderate": 0.8,
-                "n_severe": 0.65
+                "water_severe": 0.6
             }
         }
     },
@@ -508,9 +506,7 @@
             "source": "Fang et al. 2022 Front PlantSci; Kemanian et al. 2004",
             "stress": {
                 "water_moderate": 0.85,
-                "water_severe": 0.6,
-                "n_moderate": 0.8,
-                "n_severe": 0.65
+                "water_severe": 0.6
             }
         }
     },
@@ -753,9 +749,7 @@
             "source": "Kato et al. 2010 Field Crops Res; Bouman et al. 2001 (PI-to-maturity 3.91-5.21)",
             "stress": {
                 "water_moderate": 0.85,
-                "water_severe": 0.6,
-                "n_moderate": 0.8,
-                "n_severe": 0.65
+                "water_severe": 0.6
             }
         }
     },
@@ -988,9 +982,7 @@
             "source": "Purcell & Van Roekel 2019 (solar-basis 1.3-1.7 rescaled to APAR x0.5)",
             "stress": {
                 "water_moderate": 0.85,
-                "water_severe": 0.6,
-                "n_moderate": 0.8,
-                "n_severe": 0.65
+                "water_severe": 0.6
             }
         },
         "bnf": {
@@ -1282,9 +1274,7 @@
             "source": "Narayanan et al. 2013, Agron J 105:649-656",
             "stress": {
                 "water_moderate": 0.85,
-                "water_severe": 0.6,
-                "n_moderate": 0.8,
-                "n_severe": 0.65
+                "water_severe": 0.6
             }
         }
     }
