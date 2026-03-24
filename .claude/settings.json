@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python*)",
+      "Bash(python -m pytest*)",
+      "Bash(python -m uvicorn*)",
+      "Bash(python run.py*)",
+      "Bash(python scenario_runner.py*)",
+      "Bash(python diag_*.py*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git branch*)",
+      "Bash(git stash*)",
+      "Bash(git pull*)",
+      "Bash(ruff check*)",
+      "Bash(ruff format*)",
+      "Bash(npm run dev*)",
+      "Bash(npm run build*)",
+      "Bash(npm install*)",
+      "Bash(mkdir*)",
+      "Bash(ls*)",
+      "Bash(cat*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git rebase -i*)",
+      "Bash(pip install*)",
+      "Bash(npm install -g*)",
+      "Bash(curl*|bash*)",
+      "Bash(*| bash)",
+      "Bash(*| sh)"
+    ]
+  }
+}

@@ -1,109 +1,206 @@
-# CLAUDE.md
+# CLAUDE.md — AgroVisus
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Project-level instructions for Claude Code. These rules **override** all defaults.
+
+---
 
 ## Project Overview
 
-AgroVisus is a full-stack AI crop simulation and diagnostics platform. It consists of:
-- **`engine/`** — Python simulation engine (crop/soil/nutrient/disease models)
-- **`backend/`** — FastAPI REST API that wraps the engine
-- **`frontend/`** — React + Vite dashboard
+AgroVisus is a full-stack AI crop simulation and diagnostics platform.
 
-## Development Setup
+| Layer | Tech | Host |
+|---|---|---|
+| Simulation engine | Python 3.13, FastAPI | `engine/` |
+| REST API | FastAPI + Uvicorn | Render (port 8001) |
+| Frontend | React 18 + Vite + Recharts | Vercel |
+| Edge node (planned) | Jetson Nano, MQTT ingest | Field deployment |
 
-The project uses a Python virtualenv located at `engine/venv/`. All Python commands should use it.
+---
 
-### Backend
+## Repository Layout
+
+```
+engine/          Python simulation engine (models, services, tests)
+backend/         FastAPI app that wraps the engine
+frontend/        React + Vite dashboard
+.claude/         Claude Code configuration (rules, agents, hooks)
+CLAUDE.md        <- this file
+config.json      Default simulation config (backend uses this as base)
+```
+
+---
+
+## Development Commands
+
 ```bash
-# From project root
+# Backend (from project root)
 engine\venv\Scripts\python.exe -m uvicorn backend.main:app --reload --port 8001
-```
-Or use `start_backend.bat` on Windows.
 
-### Frontend
-```bash
-cd frontend
-npm install   # first time only
-npm run dev   # http://localhost:5173
-```
-Or use `start_frontend.bat` on Windows.
+# Frontend
+cd frontend && npm run dev        # http://localhost:5173
 
-Vite proxies all `/api` requests to `http://localhost:8001`, so both servers must run together.
+# Engine standalone
+cd engine && python run.py
+cd engine && python scenario_runner.py --all --days 90
 
-### Engine standalone
-```bash
+# Tests (always run from engine/)
 cd engine
-# Activate venv first
-venv\Scripts\activate
-python run.py                          # single simulation using config.json
-python run.py -d 120                   # custom duration
-python scenario_runner.py --all --days 90   # compare all crop templates
-streamlit run dashboard.py             # interactive dashboard
+python -m pytest tests/                     # must pass 167 tests
+python -m pytest tests/ --cov=app tests/    # with coverage
+
+# Lint
+cd engine && ruff check app/ && ruff format app/
 ```
 
-## Tests
+---
 
-Engine tests live in `engine/tests/`. Run from the `engine/` directory:
+## Supported Crops
+
+All five crops live in `engine/app/data/crop_templates.json`.
+That file is the **single canonical source** for all crop parameters.
+
+| Crop | HI | RUE veg (g/MJ) | RUE fill (g/MJ) | T_base (°C) | NO3 init (kg/ha) |
+|---|---|---|---|---|---|
+| corn | 0.50 | 3.8 | 3.8 | 10.0 | 40.0 |
+| wheat | 0.40 | 1.6 | 1.6 | 0.0 | 15.0 |
+| rice | 0.45 | 1.2 | 4.5 | 10.0 | 10.0 |
+| soybean | 0.35 | 2.5 | 2.5 | 10.0 | 10.0 |
+| sorghum | 0.45 | 3.2 | 3.2 | 10.0 | 15.0 |
+
+**Corn yield target: 9-12 t/ha** (143-191 bu/acre) under well-managed IL conditions.
+
+---
+
+## Core Models
+
+### Engine pipeline (`engine/app/services/simulation_pipeline.py`)
+
+`SimulationService` orchestrates each day through 8 ordered steps:
+
+1. `ManagementStep` — apply irrigation/fertilizer from schedule
+2. `WeatherStep` — Open-Meteo API -> file cache -> CSV fallback -> synthetic
+3. `SoilStep` — multi-layer cascading bucket; captures `actual_eta_mm`
+4. `NutrientStep` — N cycling + NNI + stress; uses sinusoidal soil temperature
+5. `DiseaseStep` — weather-driven infection pressure + leaf wetness
+6. `CropStep` — GDD accumulation, RUE biomass, stage advance, stress factors
+7. `RuleEvaluationStep` — pattern-matching alert engine
+8. `ReportingStep` — writes one CSV row via `ReportingService`
+
+### Model classes
+
+| Class | File | Responsibility |
+|---|---|---|
+| `CropModel` | `app/models/crop_model.py` | GDD, RUE biomass, HI, stress factors |
+| `SoilModel` | `app/models/soil_model.py` | 3-layer cascading bucket, PAW, WFPS |
+| `NutrientModel` | `app/models/nutrient_model.py` | Urea->NH4->NO3 cycling, NNI, BNF |
+| `DiseaseModel` | `app/models/disease_model.py` | Infection potential, severity, LWD |
+| `RuleEvaluator` | `app/services/rule_evaluator.py` | JSON-driven alert rule engine |
+
+---
+
+## Critical Physics Rules
+
+### 1. crop_templates.json is the canonical N source
+- **Never** hardcode initial N in model init or test fixtures.
+- The `nutrients` section of each crop template holds:
+  - `initial_nitrate_N_kg_ha` — starting soil NO3
+  - `initial_ammonium_N_kg_ha` — starting soil NH4
+- To override in tests, use `nutrient_model_config` in the config dict.
+
+### 2. `_resolve_n_initial()` four-tier priority chain
+Defined in `engine/app/services/simulation_service.py:166`.
+
+```
+Tier 1 (highest): nutrient_model_config explicit override (programmatic / API request)
+Tier 2:           crop template nutrients section  <- canonical non-request source
+Tier 3:           regional_profile soil_defaults   <- location adjustment (reserved)
+Tier 4 (lowest):  hardcoded fallback (NO3=40, NH4=10)
+```
+
+Do not break this order. Adding a new N source must fit into this chain.
+
+### 3. Plenet-Lemaire NNI
+Critical N concentration curve (Plénet & Lemaire / Djaman & Irmak 2018):
+
+```
+Nc (g/kg) = 34.0 * biomass_Mg_ha^(-0.37)
+NNI       = actual_N_kg_ha / (Nc_g_per_kg * biomass_Mg_ha)
+NNI clamped to [0.0, 1.5]
+```
+
+Defined in `NutrientModel.compute_NNI()`. Do not change coefficients 34.0 or
+-0.37 without a literature citation and a new calibration test.
+
+### 4. APSIM floored N-stress
+N stress maps NNI to stress factor using a floored linear (APSIM `nfact_photo`):
+
+```
+NNI >= 1.0          -> 1.00  (no stress)
+NNI in (0.4, 1.0)  -> NNI   (linear)
+NNI <= 0.4          -> 0.40  (biological floor)
+```
+
+The floor is intentional. Do not remove it or lower it below 0.35.
+
+### 5. Q10 = 2.0 for N mineralization
+```python
+mineralization = Nmin_25C * (2.0 ** ((soil_temp_25cm - 25.0) / 10.0))
+```
+
+Soil temperature at 25 cm uses `estimate_soil_temp_25cm()` (cosine model, peak
+DOY 220, amplitude 12 degrees C). Do not substitute raw air temperature.
+
+### 6. Soil geometry (Illinois silt loam default)
+- Root zone depth: 1200 mm
+- Layers: L1 = min(300, depth*0.25), L2 = min(600, depth*0.50), L3 = remainder
+- theta_FC=0.30, theta_WP=0.14, theta_sat=0.45 -> PAW = 192 mm
+- PAW assertion fires for profiles >= 800 mm: must be 150-400 mm.
+
+### 7. ET0 method
+Default: Penman-Monteith (FAO-56). Net radiation Rn is computed explicitly via
+`ET0Service._compute_rn()` and passed as `rn=` to pyet. Never pass `rs=`.
+Hargreaves is the automatic fallback when solar/wind data are missing.
+
+---
+
+## Test Gate
+
+**167 tests must pass before any PR merge.**
+
 ```bash
-cd engine
-python -m pytest tests/                         # all tests
-python -m pytest tests/test_validators.py       # single file
-python -m pytest --cov=app tests/              # with coverage
+cd engine && python -m pytest tests/ --tb=short -q
 ```
 
-## Linting (engine)
+- Every physics change needs at least one new numerical regression test.
+- Do not pytest.skip() or xfail without a tracking issue.
 
-```bash
-cd engine
-ruff check app/
-ruff format app/
-```
-Config is in `engine/ruff.toml` — rules E, F, W, I enabled.
+---
 
-## Integration test (requires backend running)
-```bash
-python test_api.py    # health check + crop templates + simulation POST
-```
-Note: `test_api.py` targets port 8000 but the backend runs on 8001 — update BASE url if needed.
+## Backend / API Notes
 
-## Architecture
+- Port: **8001** (Render), **5173** (Vite dev proxy)
+- CORS: `allow_origin_regex` permits `localhost:*` and `*.vercel.app`
+- `backend/routers/simulation.py` — `_build_config()` merges request into root `config.json`
+- `backend/routers/disease.py` — stub, returns randomized results; CNN pending
+- Default simulation start date: `date(2025, 5, 1)` (set in simulation router)
 
-### Data / request flow
-1. Frontend (`frontend/src/api/client.js`) calls `/api/*` via axios
-2. Vite proxy forwards to FastAPI at port 8001
-3. `backend/routers/` handles requests — `simulation.py`, `crops.py`, `disease.py`
-4. The simulation router instantiates `SimulationService` (from `engine/app/services/simulation_service.py`), writes a temp CSV, then parses it back into the response model
-5. The engine is imported by inserting `engine/` into `sys.path` at runtime
+---
 
-### Engine internals (`engine/app/`)
-`SimulationService` is the main orchestrator. Each day of simulation:
-1. Applies management events (irrigation/fertilizer) from the schedule
-2. Fetches daily weather via `WeatherService` (Open-Meteo API → file cache → CSV fallback → synthetic fallback)
-3. Calculates ET₀ via `ET0Service` (Penman-Monteith or Hargreaves)
-4. Updates `SoilModel` (multi-layer cascading bucket)
-5. Updates `NutrientModel` (N cycling: urea → ammonium → nitrate)
-6. Updates `DiseaseModel` (weather-driven pressure with leaf wetness)
-7. Updates `CropModel` (GDD accumulation, biomass via RUE, stress factors)
-8. Evaluates `RuleEvaluator` against combined state dict
-9. Writes one row to the output CSV via `ReportingService`
+## Jetson Nano Edge Node (planned)
 
-### Crop templates
-Pre-validated parameter sets for corn, wheat, rice, soybean, sorghum live in `engine/app/data/crop_templates.json`. Set `crop_model_config.crop_template` in config to use one. Individual keys in `crop_model_config` override the template.
+A Jetson Nano field unit will publish sensor readings via MQTT to a `/ingest` endpoint.
+When building this:
+- Payload schema: `{ "field_id", "timestamp", "soil_moisture", "soil_temp_c", "canopy_temp_c", "rainfall_mm" }`
+- The ingest handler updates simulation initial conditions, not a full replay.
+- Auth: device-scoped API key in `X-Device-Key` header.
 
-### Configuration
-`config.json` (project root) is the default config used by the backend. `engine/config.json` is the standalone engine default. The backend router's `_build_config()` merges the frontend request into the root `config.json` before passing it to `SimulationService`.
+---
 
-### Disease router
-`backend/routers/disease.py` is currently a **stub** — it returns randomized results from a fixed catalog. CNN model integration is pending. Do not mistake stub confidence values for real model output.
+## What NOT to Do
 
-### Frontend pages
-- `/` — Landing (`Landing.jsx`)
-- `/simulate` — Configure and run simulations, view Recharts charts (`Simulate.jsx`)
-- `/disease` — Upload leaf image for diagnosis (`Disease.jsx`)
-- `/reports` — Reports placeholder (`Reports.jsx`)
-
-### Key config values
-- Backend port: **8001**
-- Frontend port: **5173**
-- Default simulation start date hardcoded in `backend/routers/simulation.py`: `date(2024, 4, 15)`
-- Weather cache directory: `engine/.weather_cache/` (gitignored)
+- Do not change Plénet-Lemaire coefficients (34.0, -0.37) without a citation.
+- Do not substitute air temperature for soil temperature at 25 cm.
+- Do not hardcode HI values — always read `self.harvest_index` from the template.
+- Do not pass `rs=` to pyet.pm() — use `rn=` (pre-computed net radiation).
+- Do not commit `engine/outputs/*.html` or `engine/venv/`.
+- Do not force-push to `main`.
