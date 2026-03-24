@@ -29,7 +29,9 @@
         {
           "path": "crop.stage",
           "operator": "not_in",
-          "threshold": ["R6"]
+          "threshold": [
+            "R6"
+          ]
         }
       ],
       "result": {

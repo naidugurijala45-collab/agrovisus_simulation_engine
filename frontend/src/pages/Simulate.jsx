@@ -422,15 +422,22 @@ export default function Simulate() {
             longitude:               -89.0,
             initial_growth_stage:    'V8',
             soil_nitrogen_ppm:       45,
-            soil_moisture_level:     'normal',
+            soil_moisture_level:     'wet',       // 0.95 fAWC — well-managed irrigation start
             recent_rain_event:       false,
             field_acres:             100,
             treatment_cost_per_acre: 25,
             commodity_price_usd_bu:  4.5,
         });
         setFertEvents([{ id: 1, day: 7, amount: 120, fertType: 'urea' }]);
-        setIrrigEvents([]);
-        setActiveScenario('✅ Well-Managed Field — Optimal Management');
+        // 35 mm every 7 days from day 28 to 119 — center-pivot irrigation schedule
+        setIrrigEvents(
+            Array.from({ length: Math.ceil((119 - 28) / 7) + 1 }, (_, i) => ({
+                id: Date.now() + i,
+                day: 28 + i * 7,
+                amount: 35,
+            }))
+        );
+        setActiveScenario('✅ Well-Managed Field — Center-Pivot Irrigation + Adequate N');
         setPendingScenario('wellManaged');
     };
 

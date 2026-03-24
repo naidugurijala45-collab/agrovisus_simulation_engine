@@ -1,7 +1,35 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(venv/Scripts/python.exe:*)",
+      "Bash(engine/venv/Scripts/python.exe:*)",
+      "Bash(sleep 4:*)",
+      "Bash(python:*)",
+      "Bash(npm run:*)",
+      "Bash(vercel:*)",
+      "Bash(npx vercel:*)",
+      "WebFetch(domain:agrovisus-simulation-engine.vercel.app)",
+      "Bash(npm install:*)",
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "Bash(agrovisus_simulation_enginevenvScriptspython.exe:*)",
+      "Bash(\"agrovisus_simulation_engine/venv/Scripts/python.exe\":*)",
+      "Bash(cd:*)",
+      "Bash(engine/venv/Scripts/pip.exe install:*)",
+      "Bash(engine/venv/Scripts/pip.exe list:*)",
+      "Bash(cmd:*)",
+      "Bash(grep:*)",
+      "Bash(venvScriptspython.exe:*)",
+      "Bash(set PYTHONIOENCODING=utf-8:*)",
+      "Bash(del:*)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(enginevenvScriptspython.exe:*)",
+      "Bash(npx vite:*)",
+      "Bash(rm:*)",
+      "Bash(sed:*)",
+      "Bash(node:*)"
     ]
   }
 }
