@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { AlertTriangle, Play, Square, TrendingUp, XCircle } from 'lucide-react';
-import AICropDoctor from '../components/AICropDoctor';
 import { useEffect, useRef, useState } from 'react';
 import {
     Area,
@@ -1348,9 +1347,44 @@ export default function Simulate() {
                         );
                     })()}
 
-                    {/* AI Crop Doctor Chat */}
-                    <div className="card mt-6" style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                        <AICropDoctor result={result} form={form} groupedRules={groupedRules} />
+                    {/* AI Crop Doctor — coming soon placeholder */}
+                    <div className="card mt-6" style={{
+                        display: 'flex', alignItems: 'center', gap: 16,
+                        padding: '18px 20px', opacity: 0.6,
+                        border: '1px dashed var(--border-light)',
+                        background: 'transparent',
+                    }}>
+                        <div style={{
+                            width: 42, height: 42, borderRadius: 10,
+                            background: 'var(--bg-secondary)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                        }}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 3c-1.5 3-5 5-5 9a5 5 0 0010 0c0-4-3.5-6-5-9z"
+                                    stroke="var(--green-400)" strokeWidth="1.5" fill="none"/>
+                                <path d="M12 8v4M10 14h4" stroke="var(--green-400)" strokeWidth="1.3" strokeLinecap="round"/>
+                                <path d="M8 20h8" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinecap="round"/>
+                                <circle cx="18" cy="5" r="2.5" fill="var(--text-muted)"/>
+                            </svg>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                AI Crop Doctor
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                AI advisory coming soon — ask questions about your field results
+                            </div>
+                        </div>
+                        <span style={{
+                            fontSize: 10, fontWeight: 600, letterSpacing: '0.8px',
+                            textTransform: 'uppercase', color: 'var(--text-muted)',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 6, padding: '3px 9px',
+                        }}>
+                            Soon
+                        </span>
                     </div>
 
                     {/* Triggered Rules with ROI */}
