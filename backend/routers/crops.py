@@ -43,6 +43,8 @@ def get_crop_templates():
                 "t_base_c": growth.get("t_base_c"),
                 "harvest_index": growth.get("harvest_index"),
                 "total_gdd_to_maturity": growth.get("total_gdd_to_maturity"),
+                "gdd_thresholds": growth.get("gdd_thresholds", {}),
+                "stage_labels": list(growth.get("gdd_thresholds", {}).keys()),
                 "soil": {
                     "preferred_type": soil.get("preferred_type"),
                     "field_capacity_mm": soil.get("field_capacity_mm"),

@@ -77,6 +77,45 @@ function fmtDateFull(dateStr) {
 
 function kgHaToBuAcre(kg_ha) { return (kg_ha || 0) / 62.77; }
 
+/**
+ * Returns up to 5 { pct, label } stage milestones for the progress bar.
+ * pct = position along 0–100. Falls back to hardcoded corn values.
+ */
+function getStageMilestones(template, simDays) {
+    const fallback = [
+        { pct: 8,  label: 'VE' },
+        { pct: 28, label: 'V6' },
+        { pct: 52, label: 'VT' },
+        { pct: 72, label: 'R3' },
+        { pct: 90, label: 'R6' },
+    ];
+
+    if (!template?.gdd_thresholds || !template?.total_gdd_to_maturity) return fallback;
+
+    const thresholds = template.gdd_thresholds;
+    const totalGdd   = template.total_gdd_to_maturity;
+    const entries    = Object.entries(thresholds);
+
+    if (entries.length === 0) return fallback;
+
+    let picked = [];
+    if (entries.length <= 5) {
+        picked = entries;
+    } else {
+        const first  = entries[0];
+        const last   = entries[entries.length - 1];
+        const middle = entries.slice(1, -1);
+        const step   = (middle.length - 1) / 2;
+        const midPicked = [0, 1, 2].map(i => middle[Math.round(i * step)]);
+        picked = [first, ...midPicked, last];
+    }
+
+    return picked.map(([label, gdd]) => ({
+        label,
+        pct: Math.round((gdd / totalGdd) * 100),
+    }));
+}
+
 const GRADE_STYLE = {
     A: { color: '#22c55e', label: 'Excellent' },
     B: { color: '#84cc16', label: 'Good' },
@@ -266,6 +305,8 @@ export default function Simulate() {
         }
     });
     const [templates, setTemplates] = useState([]);
+    const activeTemplate   = templates.find(t => t.id === form.crop_template) || null;
+    const stageMilestones  = getStageMilestones(activeTemplate, form.sim_days);
     const [result, setResult] = useState(() => {
         try {
             const saved = sessionStorage.getItem('agrovisus_sim_result');
@@ -1026,13 +1067,7 @@ export default function Simulate() {
                     {/* Track */}
                     <div className="tractor-track">
                         {/* Crop stage milestone markers */}
-                        {[
-                            { pct: 10, label: 'VE' },
-                            { pct: 28, label: 'V6' },
-                            { pct: 52, label: 'VT' },
-                            { pct: 72, label: 'R3' },
-                            { pct: 90, label: 'R6' },
-                        ].map(({ pct, label }) => (
+                        {stageMilestones.map(({ pct, label }) => (
                             <div
                                 key={label}
                                 className={`tractor-milestone${simProgress >= pct ? ' reached' : ''}`}
@@ -1056,15 +1091,18 @@ export default function Simulate() {
                     <div className="tractor-footer">
                         <span className="tractor-day">
                             Day <strong>{Math.round((simProgress / 100) * form.sim_days)}</strong> / {form.sim_days}
+                            {(() => {
+                                const passed = stageMilestones.filter(s => simProgress >= s.pct);
+                                const activeStage = passed[passed.length - 1]?.label;
+                                return activeStage
+                                    ? <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--green-400)',
+                                        background: 'var(--green-glow)', padding: '1px 7px', borderRadius: 4,
+                                        fontWeight: 600 }}>{activeStage}</span>
+                                    : null;
+                            })()}
                         </span>
                         <div className="tractor-stage-legend">
-                            {[
-                                { pct: 10, label: 'VE' },
-                                { pct: 28, label: 'V6' },
-                                { pct: 52, label: 'VT' },
-                                { pct: 72, label: 'R3' },
-                                { pct: 90, label: 'R6' },
-                            ].map(({ pct, label }) => (
+                            {stageMilestones.map(({ pct, label }) => (
                                 <span
                                     key={label}
                                     className={`tractor-stage-chip${simProgress >= pct ? ' reached' : ''}`}
