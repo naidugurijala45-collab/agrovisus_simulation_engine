@@ -21,4 +21,7 @@ export const predictDisease = (formData) =>
 export const healthCheck = () =>
     api.get('/health').then((r) => r.data);
 
+export const askCropDoctor = (message, field_context) =>
+    api.post('/chat', { message, field_context }).then((r) => r.data);
+
 export default api;

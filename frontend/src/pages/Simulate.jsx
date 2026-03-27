@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { AlertTriangle, Play, Square, TrendingUp, XCircle } from 'lucide-react';
+import AICropDoctor from '../components/AICropDoctor';
 import { useEffect, useRef, useState } from 'react';
 import {
     Area,
@@ -1308,6 +1309,11 @@ export default function Simulate() {
                             </div>
                         );
                     })()}
+
+                    {/* AI Crop Doctor Chat */}
+                    <div className="card mt-6" style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        <AICropDoctor result={result} form={form} groupedRules={groupedRules} />
+                    </div>
 
                     {/* Triggered Rules with ROI */}
                     {groupedRules.length > 0 && (() => {

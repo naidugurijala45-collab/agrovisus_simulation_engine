@@ -2,6 +2,7 @@ import { Bug, ChevronLeft, ChevronRight, FileText, FlaskConical, LayoutDashboard
 import { useState } from 'react';
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import './index.css';
+import Dashboard from './pages/Dashboard';
 import Disease from './pages/Disease';
 import Landing from './pages/Landing';
 import Reports from './pages/Reports';
@@ -9,6 +10,7 @@ import Simulate from './pages/Simulate';
 
 const NAV = [
     { to: '/', label: 'Home', icon: <LayoutDashboard size={18} /> },
+    { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { to: '/simulate', label: 'Simulation', icon: <FlaskConical size={18} /> },
     { to: '/disease', label: 'Diagnostics', icon: <Bug size={18} /> },
     { to: '/reports', label: 'Reports', icon: <FileText size={18} /> },
@@ -58,6 +60,7 @@ export default function App() {
                 <main className={`main-content ${isCollapsed ? 'is-collapsed' : ''}`}>
                     <Routes>
                         <Route path="/" element={<Landing />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/simulate" element={<Simulate />} />
                         <Route path="/disease" element={<Disease />} />
                         <Route path="/reports" element={<Reports />} />
