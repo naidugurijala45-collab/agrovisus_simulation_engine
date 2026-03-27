@@ -287,6 +287,9 @@ export default function Simulate() {
     const [newFert, setNewFert] = useState({ day: '', amount: '', fertType: 'urea' });
     const [newIrrig, setNewIrrig] = useState({ day: '', amount: '' });
 
+    const [simProgress, setSimProgress] = useState(0);
+    const progressIntervalRef = useRef(null);
+
     const abortControllerRef = useRef(null);
     const reportRef = useRef(null);
 
@@ -311,6 +314,36 @@ export default function Simulate() {
     useEffect(() => {
         try { sessionStorage.setItem('agrovisus_sim_form', JSON.stringify(form)); } catch {}
     }, [form]);
+
+    // Tractor progress bar driver
+    useEffect(() => {
+        const active = loading || comparisonLoading;
+        if (active) {
+            setSimProgress(0);
+            clearInterval(progressIntervalRef.current);
+            // Estimate ~30ms per sim day; cap advance at 95% until API returns
+            const tickMs = Math.max(40, (form.sim_days * 30) / 95);
+            progressIntervalRef.current = setInterval(() => {
+                setSimProgress(p => (p < 95 ? p + 1 : p));
+            }, tickMs);
+        } else {
+            clearInterval(progressIntervalRef.current);
+            setSimProgress(100);
+        }
+        return () => clearInterval(progressIntervalRef.current);
+    }, [loading, comparisonLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Reset progress when comparison flips to phase 2
+    useEffect(() => {
+        if (comparisonLoading && scenario1Result) {
+            setSimProgress(0);
+            clearInterval(progressIntervalRef.current);
+            const tickMs = Math.max(40, (form.sim_days * 30) / 95);
+            progressIntervalRef.current = setInterval(() => {
+                setSimProgress(p => (p < 95 ? p + 1 : p));
+            }, tickMs);
+        }
+    }, [scenario1Result]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         try {
@@ -975,21 +1008,27 @@ export default function Simulate() {
                 </div>
             )}
 
-            {loading && (
-                <div className="spinner-wrap">
-                    <div className="spinner" />
-                    <p className="text-muted">Running {form.sim_days}-day simulation…</p>
-                </div>
-            )}
-
-            {comparisonLoading && (
-                <div className="spinner-wrap">
-                    <div className="spinner" />
-                    <p className="text-muted">
-                        {scenario1Result
-                            ? '✓ Problem Field complete — running Well-Managed simulation…'
-                            : 'Running Problem Field simulation…'}
-                    </p>
+            {(loading || comparisonLoading) && (
+                <div className="tractor-progress-wrap">
+                    <div className="tractor-track">
+                        <div className="tractor-fill" style={{ width: `${simProgress}%` }} />
+                        <span
+                            className="tractor-icon"
+                            style={{ left: `clamp(16px, ${simProgress}%, calc(100% - 16px))` }}
+                        >
+                            🚜
+                        </span>
+                    </div>
+                    <div className="tractor-progress-info">
+                        <span className="tractor-percent">{simProgress}%</span>
+                        <span className="tractor-label">
+                            {loading
+                                ? `Running ${form.sim_days}-day simulation…`
+                                : scenario1Result
+                                    ? '✓ Problem Field complete — running Well-Managed simulation…'
+                                    : 'Running Problem Field simulation…'}
+                        </span>
+                    </div>
                 </div>
             )}
 

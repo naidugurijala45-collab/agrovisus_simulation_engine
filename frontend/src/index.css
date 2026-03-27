@@ -442,29 +442,64 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: 1px solid rgba(248, 113, 113, 0.2);
 }
 
-/* ── Loading Spinner ────────────────────────────────────────────────────── */
-.spinner-wrap {
+/* ── Tractor Progress Bar ───────────────────────────────────────────────── */
+.tractor-progress-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 16px;
-  padding: 60px;
+  padding: 48px 32px;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 3px solid var(--border);
-  border-top-color: var(--green-400);
-  animation: spin 0.8s linear infinite;
+.tractor-track {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  height: 26px;
+  background: #0f1f0f;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  overflow: visible;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.tractor-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #14532d, var(--green-400));
+  border-radius: 13px;
+  transition: width 0.35s linear;
+  min-width: 0;
+}
+
+.tractor-icon {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  transition: left 0.35s linear;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+  z-index: 2;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.tractor-progress-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.tractor-percent {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--green-400);
+  font-variant-numeric: tabular-nums;
+}
+
+.tractor-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 /* ── Chart Wrapper ──────────────────────────────────────────────────────── */
