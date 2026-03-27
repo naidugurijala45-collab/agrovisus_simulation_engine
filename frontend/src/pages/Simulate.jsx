@@ -1010,24 +1010,68 @@ export default function Simulate() {
 
             {(loading || comparisonLoading) && (
                 <div className="tractor-progress-wrap">
+                    {/* Header row */}
+                    <div className="tractor-header">
+                        <span className="tractor-header-label">
+                            {loading
+                                ? `Running ${form.sim_days}-day simulation…`
+                                : scenario1Result
+                                    ? '✓ Problem Field complete — running Well-Managed…'
+                                    : 'Running Problem Field simulation…'}
+                        </span>
+                        <span className="tractor-pct-badge">{simProgress}%</span>
+                    </div>
+
+                    {/* Track */}
                     <div className="tractor-track">
+                        {/* Crop stage milestone markers */}
+                        {[
+                            { pct: 10, label: 'VE' },
+                            { pct: 28, label: 'V6' },
+                            { pct: 52, label: 'VT' },
+                            { pct: 72, label: 'R3' },
+                            { pct: 90, label: 'R6' },
+                        ].map(({ pct, label }) => (
+                            <div
+                                key={label}
+                                className={`tractor-milestone${simProgress >= pct ? ' reached' : ''}`}
+                                style={{ left: `${pct}%` }}
+                            >
+                                <span className="tractor-milestone-label">{label}</span>
+                            </div>
+                        ))}
+                        {/* Fill bar */}
                         <div className="tractor-fill" style={{ width: `${simProgress}%` }} />
+                        {/* Tractor icon — scaleX(-1) flips emoji so small tires face right */}
                         <span
                             className="tractor-icon"
-                            style={{ left: `clamp(16px, calc(100% - ${simProgress}%), calc(100% - 16px))` }}
+                            style={{ left: `clamp(16px, ${simProgress}%, calc(100% - 16px))` }}
                         >
                             🚜
                         </span>
                     </div>
-                    <div className="tractor-progress-info">
-                        <span className="tractor-percent">{simProgress}%</span>
-                        <span className="tractor-label">
-                            {loading
-                                ? `Running ${form.sim_days}-day simulation…`
-                                : scenario1Result
-                                    ? '✓ Problem Field complete — running Well-Managed simulation…'
-                                    : 'Running Problem Field simulation…'}
+
+                    {/* Footer row */}
+                    <div className="tractor-footer">
+                        <span className="tractor-day">
+                            Day <strong>{Math.round((simProgress / 100) * form.sim_days)}</strong> / {form.sim_days}
                         </span>
+                        <div className="tractor-stage-legend">
+                            {[
+                                { pct: 10, label: 'VE' },
+                                { pct: 28, label: 'V6' },
+                                { pct: 52, label: 'VT' },
+                                { pct: 72, label: 'R3' },
+                                { pct: 90, label: 'R6' },
+                            ].map(({ pct, label }) => (
+                                <span
+                                    key={label}
+                                    className={`tractor-stage-chip${simProgress >= pct ? ' reached' : ''}`}
+                                >
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}

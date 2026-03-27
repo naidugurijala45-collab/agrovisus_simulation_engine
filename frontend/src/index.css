@@ -446,62 +446,165 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .tractor-progress-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 48px 32px;
+  gap: 12px;
+  padding: 32px 28px;
+  background: linear-gradient(135deg, #0a1a0a 0%, #0f2010 100%);
+  border: 1px solid rgba(74, 222, 128, 0.18);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 0 32px rgba(74, 222, 128, 0.06);
 }
 
+/* Header */
+.tractor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tractor-header-label {
+  font-size: 13px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.tractor-pct-badge {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--green-400);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  background: rgba(74, 222, 128, 0.1);
+  padding: 2px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+/* Track */
 .tractor-track {
   position: relative;
   width: 100%;
-  max-width: 520px;
-  height: 26px;
-  background: #0f1f0f;
-  border-radius: 13px;
-  border: 1px solid var(--border);
+  height: 30px;
+  background: #071207;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 222, 128, 0.15);
   overflow: visible;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
+/* Animated fill */
 .tractor-fill {
-  position: absolute;
-  right: 0;
+  position: relative;
   height: 100%;
-  background: linear-gradient(270deg, #14532d, var(--green-400));
-  border-radius: 13px;
+  background: linear-gradient(90deg, #14532d 0%, #16a34a 60%, var(--green-400) 100%);
+  border-radius: 6px;
   transition: width 0.35s linear;
   min-width: 0;
+  overflow: hidden;
+  box-shadow: 2px 0 14px rgba(74, 222, 128, 0.45);
 }
 
+/* Moving diagonal stripes on fill */
+.tractor-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -55deg,
+    transparent 0px,
+    transparent 10px,
+    rgba(255, 255, 255, 0.07) 10px,
+    rgba(255, 255, 255, 0.07) 20px
+  );
+  animation: stripe-scroll 0.9s linear infinite;
+}
+
+@keyframes stripe-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(28px); }
+}
+
+/* Tractor icon — scaleX(-1) so small (front) tires face right */
 .tractor-icon {
   position: absolute;
   top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 22px;
+  transform: translate(-50%, -50%) scaleX(-1);
+  font-size: 24px;
   transition: left 0.35s linear;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
-  z-index: 2;
+  filter: drop-shadow(0 0 6px rgba(74, 222, 128, 0.7));
+  z-index: 4;
   line-height: 1;
   pointer-events: none;
 }
 
-.tractor-progress-info {
+/* Milestone tick marks */
+.tractor-milestone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  align-items: flex-end;
+  z-index: 3;
+  pointer-events: none;
 }
 
-.tractor-percent {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--green-400);
+.tractor-milestone::before {
+  content: '';
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 0.4s;
+}
+
+.tractor-milestone.reached::before {
+  background: rgba(74, 222, 128, 0.35);
+}
+
+.tractor-milestone-label {
+  display: none; /* labels shown in footer chips instead */
+}
+
+/* Footer */
+.tractor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tractor-day {
+  font-size: 12px;
+  color: #6b7280;
   font-variant-numeric: tabular-nums;
 }
 
-.tractor-label {
-  font-size: 13px;
-  color: var(--text-muted);
-  text-align: center;
+.tractor-day strong {
+  color: var(--green-400);
+}
+
+.tractor-stage-legend {
+  display: flex;
+  gap: 6px;
+}
+
+.tractor-stage-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #4b5563;
+  background: rgba(255, 255, 255, 0.03);
+  transition: color 0.4s, border-color 0.4s, background 0.4s;
+  letter-spacing: 0.04em;
+}
+
+.tractor-stage-chip.reached {
+  color: var(--green-400);
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(74, 222, 128, 0.08);
 }
 
 /* ── Chart Wrapper ──────────────────────────────────────────────────────── */
