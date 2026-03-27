@@ -55,6 +55,53 @@ const SUGGESTIONS = [
     'How can I improve nitrogen uptake?',
 ];
 
+function parseMarkdown(text) {
+    if (!text) return [];
+    const lines = text.split('\n');
+    const elements = [];
+
+    lines.forEach((line, lineIdx) => {
+        const isBullet = /^[\s]*[-*]\s+/.test(line);
+        const cleanLine = isBullet ? line.replace(/^[\s]*[-*]\s+/, '') : line;
+
+        const parts = [];
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        let last = 0;
+        let match;
+        while ((match = boldRegex.exec(cleanLine)) !== null) {
+            if (match.index > last) {
+                parts.push({ type: 'text', content: cleanLine.slice(last, match.index) });
+            }
+            parts.push({ type: 'bold', content: match[1] });
+            last = match.index + match[0].length;
+        }
+        if (last < cleanLine.length) {
+            parts.push({ type: 'text', content: cleanLine.slice(last) });
+        }
+
+        const inline = parts.map((p, i) =>
+            p.type === 'bold'
+                ? <strong key={i} style={{ color: 'var(--green-400)', fontWeight: 600 }}>{p.content}</strong>
+                : <span key={i}>{p.content}</span>
+        );
+
+        if (isBullet) {
+            elements.push(
+                <div key={lineIdx} style={{ display: 'flex', gap: 7, marginTop: 5 }}>
+                    <span style={{ color: 'var(--green-400)', flexShrink: 0, marginTop: 1 }}>•</span>
+                    <span>{inline}</span>
+                </div>
+            );
+        } else if (cleanLine.trim() === '') {
+            elements.push(<div key={lineIdx} style={{ height: 6 }} />);
+        } else {
+            elements.push(<div key={lineIdx} style={{ marginTop: lineIdx === 0 ? 0 : 4 }}>{inline}</div>);
+        }
+    });
+
+    return elements;
+}
+
 function Bubble({ msg }) {
     const isUser = msg.role === 'user';
     return (
@@ -73,12 +120,11 @@ function Bubble({ msg }) {
                 borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                 background: isUser ? 'var(--green-600, #16a34a)' : 'var(--bg-secondary)',
                 color: isUser ? '#fff' : 'var(--text-primary)',
-                fontSize:13, lineHeight:1.55,
+                fontSize:13, lineHeight:1.6,
                 border: isUser ? 'none' : '1px solid var(--border)',
             }}>
-                {msg.content}
-                {msg.loading && (
-                    <span style={{ display:'inline-flex', gap:3, marginLeft:6, verticalAlign:'middle' }}>
+                {msg.loading ? (
+                    <span style={{ display:'inline-flex', gap:3, verticalAlign:'middle' }}>
                         {[0,1,2].map(i => (
                             <span key={i} style={{
                                 width:5, height:5, borderRadius:'50%',
@@ -87,7 +133,7 @@ function Bubble({ msg }) {
                             }} />
                         ))}
                     </span>
-                )}
+                ) : isUser ? msg.content : parseMarkdown(msg.content)}
             </div>
         </div>
     );
