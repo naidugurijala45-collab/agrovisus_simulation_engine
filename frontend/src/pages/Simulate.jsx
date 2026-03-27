@@ -1014,7 +1014,7 @@ export default function Simulate() {
                         <div className="tractor-fill" style={{ width: `${simProgress}%` }} />
                         <span
                             className="tractor-icon"
-                            style={{ left: `clamp(16px, ${simProgress}%, calc(100% - 16px))` }}
+                            style={{ left: `clamp(16px, calc(100% - ${simProgress}%), calc(100% - 16px))` }}
                         >
                             🚜
                         </span>
